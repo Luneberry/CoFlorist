@@ -1,0 +1,176 @@
+{
+  "project": "CoFlorist",
+  "updatedAt": "2026-10-25T07:38:02.347662+00:00",
+  "totalSteps": 12,
+  "currentStep": 10,
+  "completedSteps": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "currentStatus": "10단계 리허설 준비: 외부 대화 장치 주소 확인 대기",
+  "statusBasis": "기존 모델·음성·신경 계산 검증 완료. 사용자가 실제 카메라 영상 표시 확인. 대화창 내부에 신경망 패널 통합 및 화면 확인 완료. 물리 꽃 전달은 리허설에서 검증 필요.",
+  "parallelWork": "대화창 신경망 UI 개선 완료. 11단계 README·라이선스 작성 완료, 영상·자막 미완료.",
+  "fixedConstraints": [
+    "Node.js Express → node:child_process.spawn → Python",
+    "Nebius Token Factory 실호출 + NVIDIA Nemotron 사용",
+    "한국어 음성 입력·응답 필수",
+    "실제 로봇은 운영자가 수동 조종",
+    "실제 FlyWire 계산과 별도 정책·경험 기억을 구분",
+    "D4D의 화면 구획·프로세스 관리 구조 참조, 사용자 첨부 이미지의 크림색·짙은 초록색 스타일 적용",
+    "3시간 MVP 목표",
+    "CoFlorist, 메인·설정 두 화면, 불필요한 문구 제거"
+  ],
+  "artifacts": {
+    "mockup": "output/imagegen/together-bloom-dashboard-v2.png",
+    "prompt": "output/imagegen/together-bloom-dashboard-v2-prompt.txt",
+    "guide": "docs/PROJECT_PLAN.md",
+    "previousMockup": "output/imagegen/together-bloom-dashboard-v1.png",
+    "robotReference": "assets/references/robot-workspace.png",
+    "styleReference": "assets/references/florist-style.png",
+    "app": "http://localhost:4317",
+    "readme": "README.md",
+    "implementation": "docs/IMPLEMENTATION.md",
+    "cameraGuide": "docs/CAMERA.md"
+  },
+  "steps": [
+    {
+      "id": 1,
+      "title": "문제·시연 범위와 사람·AI·로봇 역할 확정",
+      "status": "completed",
+      "owner": "함께",
+      "userAction": "꽃 작업 보조라는 목표와 운영자 수동 조종 방식 확정",
+      "completionEvidence": "대화에서 범위와 수동 조종·카메라 준비 상태 확인"
+    },
+    {
+      "id": 2,
+      "title": "고정 스택·모델 역할·D4D 참조 구조 확정",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "Express → child_process → Python 고정 조건 확인",
+      "completionEvidence": "D4D 읽기 전용 검토와 Nebius/NVIDIA 공식 문서 확인"
+    },
+    {
+      "id": 3,
+      "title": "CoFlorist 메인·설정 두 화면과 전달까지의 시연 설계",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "예상 화면과 시연 흐름 검토",
+      "completionEvidence": "사용자 요청으로 이름과 2개 탭, 최소 문구 확정. 실제 UI 구현."
+    },
+    {
+      "id": 4,
+      "title": "Nebius 계정·크레딧·API 키 준비",
+      "status": "completed",
+      "owner": "사용자",
+      "userAction": "계정 생성, 제공 토큰/크레딧 수령 방식 확인, 키 발급 후 서버 환경변수에 설정. 키 값은 채팅에 공유하지 않기",
+      "completionEvidence": "사용자가 API 키 발급 확인, 실제 Nebius 연결 테스트 성공. UI 키는 서버 메모리에서만 유지."
+    },
+    {
+      "id": 5,
+      "title": "Express·프런트엔드·Python 개발환경 구성",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "별도 작업 없음. 필요한 실행 환경 설치가 막히면 해당 요청만 처리",
+      "completionEvidence": "Node 24·Express 설치, 프로젝트 Python .venv·Brian2 구성, localhost:4317 서버 실행."
+    },
+    {
+      "id": 6,
+      "title": "실제 Nemotron 호출과 한국어 음성 입출력 검증",
+      "status": "completed",
+      "owner": "함께",
+      "userAction": "시연 브라우저의 마이크 허용 후 한국어 테스트 문장 말하기, 스피커 출력 확인",
+      "completionEvidence": "NVIDIA Nemotron 실호출로 근거 기반 흰색·빨간색 추천과 가운데/오른쪽 1송이씩 작업 해석 확인. 요청 중 대기 시 늦은 응답409, 계획 불변 확인. 사용자 한국어 입력·응답 성공 확인."
+    },
+    {
+      "id": 7,
+      "title": "FlyWire 데이터·짧은 신경 계산·child_process 연결 검증",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "별도 작업 없음. 실제 계산과 재생 표시 방식 확인",
+      "completionEvidence": "Express→spawn→Python/Brian2 실제 계산: FlyWire v630 384뉴런·20,516연결, 100Hz/200ms 입력에서 1,260스파이크. 무자극·억제·재현성 검증."
+    },
+    {
+      "id": 8,
+      "title": "대시보드·실제 카메라·꽃 배치·이벤트 표시 연결",
+      "status": "completed",
+      "owner": "함께",
+      "userAction": "사용할 카메라 또는 기존 영상 입력 방식 지정, 시연 화면 구도 확인",
+      "completionEvidence": "사용자가 실제 카메라 영상 표시 확인. 초파리 신경망을 대화창 상단으로 이동하고 브라우저에서 배치 확인."
+    },
+    {
+      "id": 9,
+      "title": "대화 근거·작업 상태·운영자 입력·대기/재개·실패 기억·전달 완료 구현",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "수령자와 근거 대화 준비 및 시연용 여부 표시, 운영자 입력 방식과 허용된 대체 파지 방법 확인",
+      "completionEvidence": "대기/재개·실패방법 기억·승인·수령/해제 상태 구현. 상태·파서·실제 로컬 API 전체 21개 테스트 통과. 물리 수행은 10단계 별도."
+    },
+    {
+      "id": 10,
+      "title": "실제 로봇으로 배치부터 꽃다발 전달·수령까지 리허설",
+      "status": "pending",
+      "owner": "함께",
+      "userAction": "흰색·빨간색 꽃과 가벼운 홀더/슬리브 준비, 대기·재개·실패·재시도·들기·건네기·수령·놓기 확인",
+      "completionEvidence": null
+    },
+    {
+      "id": 11,
+      "title": "영상·영어 자막·README·라이선스·기술 근거 준비",
+      "status": "in_progress",
+      "owner": "함께",
+      "userAction": "실물 로봇 동작 영상 촬영, 공개 가능한 장면·자산 확인, 제출 설명 검토",
+      "completionEvidence": "README·구현 문서·MIT 라이선스·데이터 출처 작성. 영상·영어 자막은 남음."
+    },
+    {
+      "id": 12,
+      "title": "제출 항목 최종 확인·업로드·접수 확인",
+      "status": "pending",
+      "owner": "사용자",
+      "userAction": "공개 저장소·영상·데모/테스트 안내 링크 점검, Devpost 입력·제출 후 접수 확인",
+      "completionEvidence": null
+    }
+  ],
+  "demo": {
+    "version": 2,
+    "targetDurationSeconds": 168,
+    "openingSpeaker": "human",
+    "openingLine": "그 사람에게 꽃을 선물하고 싶어.",
+    "recommendedColors": [
+      "white",
+      "red"
+    ],
+    "memoryEvidenceRequired": true,
+    "executionMode": "human_teleoperation",
+    "arrangementApprovalLine": "이 배치가 좋아.",
+    "completionCondition": "운영자가 실제 꽃다발 수령과 그리퍼 놓기 완료를 확인",
+    "handoffStates": [
+      "arrangement_approved",
+      "handoff_preparing",
+      "bouquet_grasping",
+      "bouquet_lifted",
+      "handing_over",
+      "awaiting_receipt",
+      "released",
+      "completed"
+    ]
+  },
+  "externalConversation": {
+    "status": "receiver_verified_waiting_for_device_url",
+    "transport": "SSE / EventSource",
+    "ui": "설정 → 외부 대화",
+    "events": [
+      "message",
+      "state"
+    ],
+    "verified": "로컬 예시 스트림 텍스트·상태 수신, thinking 시 실제 FlyWire 계산, 중복/잘못된 이벤트 검증 2개 테스트 통과",
+    "pending": "상대 장치 SSE 주소·CORS 허용 및 실기기 연결 확인",
+    "example": "examples/conversation-stream.mjs"
+  }
+}

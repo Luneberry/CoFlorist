@@ -1,0 +1,127 @@
+{
+  "project": "함께꽃 / Together Bloom",
+  "updatedAt": "2026-10-25T14:15:18+09:00",
+  "totalSteps": 12,
+  "currentStep": 4,
+  "completedSteps": [
+    1,
+    2,
+    3
+  ],
+  "currentStatus": "Nebius 계정·크레딧·API 키 준비 중",
+  "statusBasis": "확인된 작업만 완료 처리. 목업은 설계 결과이며 실제 API·음성·신경 계산·로봇 자동 제어가 구현된 상태가 아님.",
+  "parallelWork": "4단계 진행 중에도 5·8단계의 API에 의존하지 않는 작업은 병행 가능. 아직 이번 요청에서 앱 구현은 시작하지 않음.",
+  "fixedConstraints": [
+    "Node.js Express → node:child_process.spawn → Python",
+    "Nebius Token Factory 실호출 + NVIDIA Nemotron 사용",
+    "한국어 음성 입력·응답 필수",
+    "실제 로봇은 운영자가 수동 조종",
+    "실제 FlyWire 계산과 별도 정책·경험 기억을 구분",
+    "D4D의 디자인과 프로세스 관리 패턴 참조",
+    "3시간 MVP 목표"
+  ],
+  "artifacts": {
+    "mockup": "output/imagegen/together-bloom-dashboard-v1.png",
+    "prompt": "output/imagegen/together-bloom-dashboard-v1-prompt.txt",
+    "guide": "docs/PROJECT_PLAN.md"
+  },
+  "steps": [
+    {
+      "id": 1,
+      "title": "문제·시연 범위와 사람·AI·로봇 역할 확정",
+      "status": "completed",
+      "owner": "함께",
+      "userAction": "꽃 작업 보조라는 목표와 운영자 수동 조종 방식 확정",
+      "completionEvidence": "대화에서 범위와 수동 조종·카메라 준비 상태 확인"
+    },
+    {
+      "id": 2,
+      "title": "고정 스택·모델 역할·D4D 참조 구조 확정",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "Express → child_process → Python 고정 조건 확인",
+      "completionEvidence": "D4D 읽기 전용 검토와 Nebius/NVIDIA 공식 문서 확인"
+    },
+    {
+      "id": 3,
+      "title": "대시보드 예상 이미지와 시연 플로우 설계",
+      "status": "completed",
+      "owner": "Codex",
+      "userAction": "예상 화면과 시연 흐름 검토",
+      "completionEvidence": "예상 이미지 생성·검수 및 2분 45초 시연안 작성. 구현 완료를 뜻하지 않음"
+    },
+    {
+      "id": 4,
+      "title": "Nebius 계정·크레딧·API 키 준비",
+      "status": "in_progress",
+      "owner": "사용자",
+      "userAction": "계정 생성, 제공 토큰/크레딧 수령 방식 확인, 키 발급 후 서버 환경변수에 설정. 키 값은 채팅에 공유하지 않기",
+      "completionEvidence": null
+    },
+    {
+      "id": 5,
+      "title": "Express·프런트엔드·Python 개발환경 구성",
+      "status": "pending",
+      "owner": "Codex",
+      "userAction": "별도 작업 없음. 필요한 실행 환경 설치가 막히면 해당 요청만 처리",
+      "completionEvidence": null
+    },
+    {
+      "id": 6,
+      "title": "실제 Nemotron 호출과 한국어 음성 입출력 검증",
+      "status": "pending",
+      "owner": "함께",
+      "userAction": "시연 브라우저의 마이크 허용 후 한국어 테스트 문장 말하기, 스피커 출력 확인",
+      "completionEvidence": null
+    },
+    {
+      "id": 7,
+      "title": "FlyWire 데이터·짧은 신경 계산·child_process 연결 검증",
+      "status": "pending",
+      "owner": "Codex",
+      "userAction": "별도 작업 없음. 실제 계산과 재생 표시 방식 확인",
+      "completionEvidence": null
+    },
+    {
+      "id": 8,
+      "title": "대시보드·실제 카메라·꽃 배치·이벤트 표시 연결",
+      "status": "pending",
+      "owner": "함께",
+      "userAction": "사용할 카메라 또는 기존 영상 입력 방식 지정, 시연 화면 구도 확인",
+      "completionEvidence": null
+    },
+    {
+      "id": 9,
+      "title": "작업 상태·운영자 입력·대기/재개·실패 기억 구현",
+      "status": "pending",
+      "owner": "Codex",
+      "userAction": "운영자 시작/완료/실패 입력 방식 확인, 허용된 대체 파지 방법 제시",
+      "completionEvidence": null
+    },
+    {
+      "id": 10,
+      "title": "실제 로봇으로 전체 시연 및 오류 복구 리허설",
+      "status": "pending",
+      "owner": "함께",
+      "userAction": "로봇 수동 조종과 수행 결과 입력, 대기·재개·실패·재시도·네트워크 오류 확인",
+      "completionEvidence": null
+    },
+    {
+      "id": 11,
+      "title": "영상·영어 자막·README·라이선스·기술 근거 준비",
+      "status": "pending",
+      "owner": "함께",
+      "userAction": "실물 로봇 동작 영상 촬영, 공개 가능한 장면·자산 확인, 제출 설명 검토",
+      "completionEvidence": null
+    },
+    {
+      "id": 12,
+      "title": "제출 항목 최종 확인·업로드·접수 확인",
+      "status": "pending",
+      "owner": "사용자",
+      "userAction": "공개 저장소·영상·데모/테스트 안내 링크 점검, Devpost 입력·제출 후 접수 확인",
+      "completionEvidence": null
+    }
+  ]
+}
+
