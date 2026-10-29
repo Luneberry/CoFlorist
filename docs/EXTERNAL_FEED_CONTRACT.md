@@ -40,7 +40,7 @@ data: <one JSON object on one line>
 | `role` | for `message` | `user` · `assistant` |
 | `text` | for `message` | 1–2000 characters |
 | `flower` | assistant, optional | flower name or `""` |
-| `flower_color` | assistant, optional | `white` · `red` · `yellow` · `purple` · `""`. The server must send one of these values; any other value fails validation and the whole event is not displayed. |
+| `flower_color` | assistant, optional | `white` · `red` · `yellow` · `purple` · `""`. An unsupported value is treated as `""`: the reply and circuit run remain visible, but no flower placement is queued. |
 | `emotion` | assistant, optional | `neutral` · `happy` · `sad` · `angry` · `surprised` · `loving` · `winking` · `sleepy` · `confused` |
 | `stimulus_hz` | assistant, optional | integer 0–250. **Only assistant messages that carry `stimulus_hz` trigger a circuit run.** A non-empty supported `flower_color` queues one pending placement for the operator. |
 | `at` | optional | ISO-8601 time. The current dashboard displays the event's receipt time instead. |

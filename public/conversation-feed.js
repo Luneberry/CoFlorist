@@ -22,7 +22,6 @@ export function applyFeedEvent(state, event, now = new Date().toISOString()) {
     if (!['user', 'assistant'].includes(event.role) || typeof event.text !== 'string' || !event.text.trim() || event.text.length > 2000) throw new Error('role과 1~2,000자 text가 필요합니다.');
     if (event.role === 'assistant') {
       if (event.stimulus_hz !== undefined && (!Number.isInteger(event.stimulus_hz) || event.stimulus_hz < 0 || event.stimulus_hz > 250)) throw new Error('stimulus_hz는 0~250 정수여야 합니다.');
-      if (event.flower_color !== undefined && (typeof event.flower_color !== 'string' || !COLORS.has(event.flower_color))) throw new Error('꽃 색을 확인해 주세요.');
       if (event.flower !== undefined && (typeof event.flower !== 'string' || event.flower.length > 100)) throw new Error('꽃 이름을 확인해 주세요.');
       if (event.emotion !== undefined && (typeof event.emotion !== 'string' || event.emotion.length > 40)) throw new Error('감정 값을 확인해 주세요.');
     }
@@ -37,7 +36,7 @@ export function applyFeedEvent(state, event, now = new Date().toISOString()) {
     const message = { id: event.id, role: event.role, text: event.text.trim(), createdAt: now };
     if (event.role === 'assistant') {
       message.flower = event.flower || '';
-      message.flowerColor = event.flower_color || '';
+      message.flowerColor = COLORS.has(event.flower_color) ? event.flower_color : '';
       message.emotion = event.emotion || '';
       if (event.stimulus_hz !== undefined) {
         message.stimulusHz = event.stimulus_hz;

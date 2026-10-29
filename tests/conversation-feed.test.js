@@ -40,11 +40,21 @@ test('invalid events cannot change displayed state or run operator actions', () 
     { id: 'bad', type: 'state', state: 'completed' },
     { id: 'bad', type: 'message', role: 'system', text: 'x' },
     { id: 'bad', type: 'message', role: 'user', text: 'x'.repeat(2001) },
-    { id: 'bad', type: 'message', role: 'assistant', text: 'x', stimulus_hz: 251 },
-    { id: 'bad', type: 'message', role: 'assistant', text: 'x', flower_color: 'green' }]) {
+    { id: 'bad', type: 'message', role: 'assistant', text: 'x', stimulus_hz: 251 }]) {
     assert.throws(() => applyFeedEvent(state, event));
     assert.deepEqual(state, createFeedState());
   }
+});
+
+test('unsupported flower colours keep the reply and circuit input but cannot queue a flower', () => {
+  const state = createFeedState();
+  for (const [id, flower_color] of [['a1', 'green'], ['a2', 42]]) {
+    assert.equal(applyFeedEvent(state, { id, type: 'message', role: 'assistant', text: '꽃 얘기예요.', flower: '장미', flower_color, stimulus_hz: 60 }), true);
+  }
+  assert.equal(state.turnCount, 2);
+  assert.deepEqual(state.messages.map(message => [message.text, message.flowerColor, message.stimulusHz]), [
+    ['꽃 얘기예요.', '', 60], ['꽃 얘기예요.', '', 60],
+  ]);
 });
 
 test('pluggable Flora sample follows the feed contract with three circuit turns', () => {
