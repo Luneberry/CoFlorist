@@ -28,6 +28,7 @@ SUGAR_IDS = [
     "720575940632425919", "720575940633143833", "720575940612670570",
     "720575940628853239", "720575940629176663", "720575940611875570",
 ]
+MN9_ID = "720575940660219265"
 
 
 def digest(path: Path) -> str:
@@ -70,7 +71,9 @@ def prepare(output: Path, count: int) -> dict:
     post = con["Postsynaptic_Index"].astype(int)
     weights = con["Excitatory x Connectivity"].astype(float)
 
-    selected = set(seed_indices)
+    # Keep the named motor readout in the bounded subset when it exists upstream.
+    pinned_indices = [id_to_original[MN9_ID]] if MN9_ID in id_to_original else []
+    selected = set(seed_indices) | set(pinned_indices)
     frontier = set(seed_indices)
     # Include all real edges among selected neurons. Selection is a bounded,
     # deterministic downstream expansion by total absolute connection weight.
@@ -96,7 +99,8 @@ def prepare(output: Path, count: int) -> dict:
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "sourceNeuronCount": len(comp), "sourceConnectionRowCount": len(con),
         "neuronCount": len(nodes), "connectionCount": len(edges), "requestedNeuronCount": count,
-        "selection": "21 sugar sensory neurons from upstream example.ipynb; deterministic downstream expansion ranked by absolute original connection weight; induced edges only",
+        "selection": "21 sugar sensory neurons from upstream example.ipynb; MN9 readout pinned when present; deterministic downstream expansion ranked by absolute original connection weight; induced edges only",
+        "pinnedReadoutIds": [MN9_ID] if pinned_indices else [],
         "model": "Brian2 leaky integrate-and-fire, original constants and signed effective weights; NumPy code generation; isolated subset reset before each trial",
         "limitations": "An isolated real-connectome subset, not a whole-brain reproduction. Boundary inputs are omitted. Flower/dialogue mappings are application design, not biological emotion or social cognition. No neural learning is implemented.",
         "sources": sources,

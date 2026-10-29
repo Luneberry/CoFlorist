@@ -1,5 +1,13 @@
 export function createFeedState() {
-  return { phase: 'idle', messages: [], seen: [], error: '' };
+  return { phase: 'idle', messages: [], seen: [], error: '', turnCount: 0, samples: [] };
+}
+
+const COLORS = new Set(['', 'white', 'red', 'yellow', 'purple']);
+
+// These are application display rules; the circuit does not infer intent or emotion.
+export function brainBadge(rateHz, reachThreshold, offerThreshold) {
+  if (!Number.isFinite(rateHz)) return 'wait';
+  return rateHz >= offerThreshold ? 'offer' : rateHz >= reachThreshold ? 'reach' : 'wait';
 }
 
 // The stream carries display events only: never robot commands or model prompts.
@@ -11,6 +19,12 @@ export function applyFeedEvent(state, event, now = new Date().toISOString()) {
     if (!['idle', 'listening', 'thinking', 'speaking', 'error'].includes(event.state)) throw new Error('대화 상태를 확인해 주세요.');
   } else if (event.type === 'message') {
     if (!['user', 'assistant'].includes(event.role) || typeof event.text !== 'string' || !event.text.trim() || event.text.length > 2000) throw new Error('role과 1~2,000자 text가 필요합니다.');
+    if (event.role === 'assistant') {
+      if (event.stimulus_hz !== undefined && (!Number.isInteger(event.stimulus_hz) || event.stimulus_hz < 0 || event.stimulus_hz > 250)) throw new Error('stimulus_hz는 0~250 정수여야 합니다.');
+      if (event.flower_color !== undefined && (typeof event.flower_color !== 'string' || !COLORS.has(event.flower_color))) throw new Error('꽃 색을 확인해 주세요.');
+      if (event.flower !== undefined && (typeof event.flower !== 'string' || event.flower.length > 100)) throw new Error('꽃 이름을 확인해 주세요.');
+      if (event.emotion !== undefined && (typeof event.emotion !== 'string' || event.emotion.length > 40)) throw new Error('감정 값을 확인해 주세요.');
+    }
   } else throw new Error('지원 이벤트는 state, message입니다.');
   state.seen.push(event.id);
   if (state.seen.length > 500) state.seen.shift();
@@ -19,7 +33,18 @@ export function applyFeedEvent(state, event, now = new Date().toISOString()) {
     state.phase = event.state;
     if (event.state === 'error') state.error = '외부 대화 장치 확인 필요';
   } else {
-    state.messages.push({ id: event.id, role: event.role, text: event.text.trim(), createdAt: now });
+    const message = { id: event.id, role: event.role, text: event.text.trim(), createdAt: now };
+    if (event.role === 'assistant') {
+      message.flower = event.flower || '';
+      message.flowerColor = event.flower_color || '';
+      message.emotion = event.emotion || '';
+      if (event.stimulus_hz !== undefined) {
+        message.stimulusHz = event.stimulus_hz;
+        message.turn = ++state.turnCount;
+        message.analysisStatus = 'pending';
+      }
+    }
+    state.messages.push(message);
     if (state.messages.length > 200) state.messages.shift();
   }
   return true;

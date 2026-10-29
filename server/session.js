@@ -99,6 +99,31 @@ export function addMessage(session, role, text) {
   return changed(session);
 }
 
+// External dialogue suggests a flower only. Operator actions still control every physical step.
+export function queueExternalFlower(session, input) {
+  if (!input || typeof input.eventId !== 'string' || !input.eventId.trim() || input.eventId.length > 160 || !COLORS.has(input.color)) {
+    reject('외부 꽃 제안의 id와 색상을 확인해 주세요.', 'INVALID_INPUT');
+  }
+  const existing = session.placements.find(item => item.sourceEventId === input.eventId);
+  if (existing) return session;
+  if (session.placements.length >= MAX_FLOWERS) reject('꽃은 최대 12송이까지 배치할 수 있습니다.');
+  if (['approved', 'lifting', 'handover', 'awaiting_receipt', 'completed'].includes(session.phase)) {
+    reject('이미 확정한 작품에는 꽃을 추가할 수 없습니다.');
+  }
+  const positions = ['center', 'left', 'right'];
+  const placement = {
+    id: randomUUID(), color: input.color, position: positions[session.placements.length % positions.length],
+    quantity: 1, status: 'pending', sourceEventId: input.eventId,
+  };
+  session.placements.push(placement);
+  if (session.phase === 'idle') session.phase = 'planning';
+  if (session.paused && session.resumePhase === 'idle') session.resumePhase = 'planning';
+  event(session, 'external_flower.suggested', '외부 대화에서 꽃 제안을 받았습니다. 운영자 확인을 기다립니다.', {
+    taskId: placement.id, sourceEventId: input.eventId, color: input.color,
+  });
+  return changed(session);
+}
+
 export function applyIntent(session, modelResult) {
   if (!modelResult || !INTENTS.has(modelResult.intent)) reject('지원하지 않는 대화 의도입니다.', 'INVALID_INPUT');
   if (modelResult.shortExplanation !== undefined && typeof modelResult.shortExplanation !== 'boolean') {

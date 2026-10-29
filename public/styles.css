@@ -57,3 +57,18 @@
 @media(min-width:1500px){.conversation-card{height:710px}.conversation-brain .brain-chart{height:145px}}
 @media(max-width:800px){.conversation-card{height:690px}}
 @media(prefers-reduced-motion:reduce){.conversation-brain *{animation:none!important}}
+
+.external-flower,.external-neural-readout{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:9px;color:#59724b;flex-wrap:wrap}
+.external-flower .color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.external-neural-readout{color:#6c7963;line-height:1.5}
+.decision-badge{padding:3px 6px;border-radius:4px;background:#e3ead8;color:#436534;font-size:8px;letter-spacing:.04em}
+.decision-badge.offer{background:#e9e0c9;color:#705727}
+.decision-badge.wait{background:#eceee9;color:#65705e}
+.external-brain-metrics{margin-top:9px;padding-top:8px;border-top:1px solid #dce5d3}
+.external-brain-metrics[hidden]{display:none}
+.sweetness-heading,.turn-trend{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#60784f;font-size:8px}
+.sweetness-heading strong{font-size:9px;font-weight:600}
+.sweetness-track{height:5px;margin:5px 0 6px;background:#dce5d3;border-radius:9px;overflow:hidden}
+.sweetness-track span{display:block;height:100%;width:0;background:#b0a267;border-radius:9px;transition:width .3s}
+.turn-trend svg{width:100px;height:24px;overflow:visible}
+.brain-attribution{margin:8px 0 0;color:#829076;font-size:7px;line-height:1.4;text-align:center}

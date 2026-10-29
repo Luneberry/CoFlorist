@@ -1,4 +1,4 @@
-import { createFeedState, applyFeedEvent } from './conversation-feed.js';
+import { createFeedState, applyFeedEvent, brainBadge } from './conversation-feed.js';
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const colorNames = { white: '흰 꽃', red: '빨간 꽃', yellow: '노란 꽃', purple: '보라 꽃' };
@@ -21,7 +21,10 @@ let externalMode = false;
 let externalConnected = false;
 let externalFeed = createFeedState();
 let externalSilenceTimer = null;
-let externalBrainPending = false;
+let externalBrainQueue = Promise.resolve();
+// Calibrated with the local 384-neuron subset; see docs/FLORA_BRAIN_SWEEP.md.
+const REACH_RATE_HZ = 1;
+const OFFER_RATE_HZ = 7;
 let selectedVoice = '';
 let voices = [];
 let chatInFlight = false;
@@ -65,6 +68,7 @@ function navigate(page) {
     if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
   });
   history.replaceState(null, '', `#${localView}`);
+  if (localView === 'main' && externalMode) requestAnimationFrame(() => { const host = $('#messages'); host.scrollTop = host.scrollHeight; });
 }
 
 function setBadge(selector, text, status) {
@@ -109,6 +113,7 @@ function render(next) {
   renderProgress();
   renderOperator();
   renderBrain();
+  renderExternalMetrics();
   if (first || previous?.settings?.model !== settings.model) ensureModel(settings.model);
   initialized = true;
 }
@@ -154,7 +159,30 @@ function renderMessages() {
     const date = new Date(item.createdAt); time.textContent = Number.isFinite(date.getTime()) ? date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
     label.append(time);
     const body = document.createElement('p'); body.className = 'message-body'; body.textContent = item.text;
-    message.append(label, body); host.append(message);
+    message.append(label, body);
+    if (externalMode && item.role === 'assistant') {
+      if (item.flowerColor) {
+        const flower = document.createElement('div'); flower.className = 'external-flower';
+        const dot = document.createElement('i'); dot.className = `color-dot ${item.flowerColor}`;
+        const name = document.createElement('span'); name.textContent = item.flower || colorNames[item.flowerColor];
+        flower.append(dot, name); message.append(flower);
+      }
+      if (Number.isInteger(item.stimulusHz)) {
+        const readout = document.createElement('div'); readout.className = 'external-neural-readout';
+        if (item.analysis) {
+          const badge = document.createElement('strong'); badge.className = `decision-badge ${item.analysis.badge}`;
+          badge.textContent = item.analysis.badge.toUpperCase();
+          badge.title = '앱에서 정의한 운영자 참고 제안 · 자동 로봇 동작 없음';
+          const metrics = document.createElement('span');
+          metrics.textContent = `활성 ${item.analysis.activeNeurons} · 하위 ${item.analysis.downstreamRateHz.toFixed(1)} Hz${item.analysis.mn9RateHz == null ? '' : ` · MN9 ${item.analysis.mn9RateHz.toFixed(1)} Hz`}`;
+          readout.append(badge, metrics);
+        } else {
+          readout.textContent = item.analysisStatus === 'error' ? '회로 계산 오류 · 설정에서 확인' : '회로 계산 중…';
+        }
+        message.append(readout);
+      }
+    }
+    host.append(message);
   }
   if (session.busy) {
     const pending = document.createElement('article'); pending.className = 'message assistant pending';
@@ -217,6 +245,23 @@ function svgElement(tag, attributes) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
   return element;
+}
+
+function renderExternalMetrics() {
+  const host = $('#external-brain-metrics');
+  host.hidden = !externalMode;
+  if (!externalMode) return;
+  const latest = [...externalFeed.messages].reverse().find(item => Number.isInteger(item.stimulusHz));
+  $('#sweetness-value').textContent = latest ? `${latest.stimulusHz} / 250 Hz` : '— / 250 Hz';
+  $('#sweetness-fill').style.width = `${latest ? latest.stimulusHz / 250 * 100 : 0}%`;
+  const svg = $('#brain-sparkline'); svg.replaceChildren();
+  const values = externalFeed.samples.map(item => item.downstreamRateHz);
+  if (!values.length) { svg.setAttribute('aria-label', '계산된 턴이 없습니다'); return; }
+  const max = Math.max(1, ...values);
+  const points = values.map((value, index) => `${3 + index * 154 / Math.max(1, values.length - 1)},${27 - value / max * 24}`).join(' ');
+  svg.append(svgElement('polyline', { points, fill: 'none', stroke: '#648448', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  values.forEach((value, index) => svg.append(svgElement('circle', { cx: 3 + index * 154 / Math.max(1, values.length - 1), cy: 27 - value / max * 24, r: 2.4, fill: '#648448' })));
+  svg.setAttribute('aria-label', `${values.length}턴의 하위 회로 발화율: ${values.map(value => value.toFixed(1)).join(', ')} Hz`);
 }
 
 function renderBrain() {
@@ -308,6 +353,7 @@ function connectExternalFeed(url) {
   disconnectExternalFeed();
   stopSpeaking(); discardRecognition = true; recognition?.abort();
   externalMode = true; externalFeed = createFeedState();
+  externalBrainQueue = Promise.resolve();
   const source = new EventSource(parsed.href);
   externalSource = source;
   $('#external-disconnect').disabled = false;
@@ -321,17 +367,45 @@ function connectExternalFeed(url) {
   source.onmessage = event => {
     if (externalSource !== source) return;
     try {
-      const previousPhase = externalFeed.phase;
-      if (!applyFeedEvent(externalFeed, JSON.parse(event.data))) return;
+      const feedEvent = JSON.parse(event.data);
+      if (!applyFeedEvent(externalFeed, feedEvent)) return;
+      const feed = externalFeed;
+      const message = feed.messages.at(-1);
+      const freshMessage = message?.id === feedEvent.id && feedEvent.type === 'message';
       clearTimeout(externalSilenceTimer);
       externalSilenceTimer = setTimeout(() => { externalFeed.phase = 'idle'; if (state) render(state); }, 45000);
       render(state);
-      // A single real simulation on entry to thinking. This never calls the LLM or moves a robot.
-      if (externalFeed.phase === 'thinking' && previousPhase !== 'thinking' && !externalBrainPending && !['starting', 'running'].includes(state?.brain?.status)) {
-        externalBrainPending = true;
-        api('/api/brain/run', { stimulusHz: 100, durationMs: 200, seed: 42, intent: 'external_conversation' })
-          .catch(error => feedback('#brain-feedback', error.message, true))
-          .finally(() => { externalBrainPending = false; });
+      if (freshMessage && message.role === 'assistant') {
+        if (message.flowerColor) {
+          api('/api/external/flower', { eventId: message.id, color: message.flowerColor })
+            .catch(error => feedback('#external-feedback', `꽃 배치 제안: ${error.message}`, true));
+        }
+        if (Number.isInteger(message.stimulusHz)) {
+          externalBrainQueue = externalBrainQueue.then(async () => {
+            if (externalSource !== source || externalFeed !== feed) return;
+            try {
+              const { result } = await api('/api/brain/run', {
+                stimulusHz: message.stimulusHz, durationMs: 200, seed: message.turn,
+              });
+              if (externalSource !== source || externalFeed !== feed) return;
+              message.analysis = {
+                activeNeurons: result.activeNeurons,
+                downstreamRateHz: result.downstreamRateHz,
+                mn9RateHz: result.mn9RateHz,
+                badge: brainBadge(result.downstreamRateHz, REACH_RATE_HZ, OFFER_RATE_HZ),
+              };
+              message.analysisStatus = 'complete';
+              feed.samples.push({ turn: message.turn, downstreamRateHz: result.downstreamRateHz });
+              if (feed.samples.length > 200) feed.samples.shift();
+              render(state);
+            } catch (error) {
+              if (externalSource !== source || externalFeed !== feed) return;
+              message.analysisStatus = 'error';
+              feedback('#brain-feedback', error.message, true);
+              render(state);
+            }
+          });
+        }
       }
     } catch (error) { feedback('#external-feedback', error.message, true); }
   };

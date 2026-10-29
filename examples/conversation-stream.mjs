@@ -59,13 +59,20 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       demoStarted = true;
       const send = event => publish({ id: randomUUID(), ...event });
       send({ type: 'state', state: 'listening' });
-      setTimeout(() => send({ type: 'message', role: 'user', text: '[연결 예시] 그 사람에게 꽃을 선물하고 싶어.' }), 1500);
-      setTimeout(() => send({ type: 'state', state: 'thinking' }), 2000);
+      setTimeout(() => send({ type: 'message', role: 'user', text: '[연결 예시] 그 사람에게 꽃을 선물하고 싶어.' }), 500);
+      setTimeout(() => send({ type: 'state', state: 'thinking' }), 750);
       setTimeout(() => {
-        send({ type: 'message', role: 'assistant', text: '[연결 예시] 흰 꽃과 빨간 꽃을 함께 준비할까요?' });
+        send({ type: 'message', role: 'assistant', text: '[연결 예시] 흰 백합을 한 송이 준비해 볼까요?', flower: '백합', flower_color: 'white', emotion: 'calm', stimulus_hz: 60 });
         send({ type: 'state', state: 'speaking' });
-      }, 14000);
-      setTimeout(() => send({ type: 'state', state: 'idle' }), 32000);
+      }, 1200);
+      setTimeout(() => send({ type: 'state', state: 'listening' }), 1800);
+      setTimeout(() => send({ type: 'message', role: 'user', text: '[연결 예시] 빨간 꽃도 좋아요.' }), 2100);
+      setTimeout(() => send({ type: 'state', state: 'thinking' }), 2400);
+      setTimeout(() => {
+        send({ type: 'message', role: 'assistant', text: '[연결 예시] 빨간 장미도 제안할게요.', flower: '장미', flower_color: 'red', emotion: 'happy', stimulus_hz: 120 });
+        send({ type: 'state', state: 'speaking' });
+      }, 3000);
+      setTimeout(() => send({ type: 'state', state: 'idle' }), 3600);
     },
   });
   const port = Number(process.env.STREAM_PORT || 4320);

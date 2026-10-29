@@ -110,6 +110,23 @@ test('real localhost API preserves local credentials and operator-only transitio
       assert.ok(reset.data.session.revision > resumed.data.session.revision);
     });
 
+    await t.test('external flower queues once and never starts an operator task', async () => {
+      const body = { eventId: 'assistant-1', color: 'white' };
+      const first = await request('/api/external/flower', body);
+      assert.equal(first.status, 200);
+      assert.equal(first.data.session.phase, 'planning');
+      assert.equal(first.data.session.placements.length, 1);
+      assert.equal(first.data.session.placements[0].status, 'pending');
+      assert.equal(first.data.session.activeTask, null);
+      const revision = first.data.session.revision;
+      const replay = await request('/api/external/flower', body);
+      assert.equal(replay.data.session.revision, revision);
+      assert.equal(replay.data.session.placements.length, 1);
+      assert.equal((await request('/api/external/flower', { eventId: 'bad', color: 'green' })).status, 400);
+      const reset = await request('/api/action', { action: 'reset' });
+      assert.equal(reset.data.session.placements.length, 0);
+    });
+
     await t.test('settings are validated atomically', async () => {
       const before = (await request('/api/state')).data.settings;
       for (const invalid of [

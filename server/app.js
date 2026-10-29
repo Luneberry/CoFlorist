@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createSession, applyIntent, applyAction, addMessage } from './session.js';
+import { createSession, applyIntent, applyAction, addMessage, queueExternalFlower } from './session.js';
 import { BrainWorker, DEFAULT_PYTHON, DEFAULT_BRAIN_DATA } from './brain-worker.js';
 import { DEFAULT_MODEL, validateModel, testConnection, listModels, chat } from './nebius.js';
 
@@ -130,6 +130,16 @@ app.post('/api/action',(req,res)=>{
   audit('operator_action',{action,phase:session.phase,revision:session.revision});
   persist();
   if(['retry','fail'].includes(action))runBrain('retry');
+  res.json(snapshot());
+});
+app.post('/api/external/flower',(req,res)=>{
+  const candidate=structuredClone(session);
+  queueExternalFlower(candidate,req.body);
+  if(candidate.revision!==session.revision){
+    session=candidate;
+    audit('external_flower_suggested',{eventId:req.body.eventId,color:req.body.color,revision:session.revision});
+    persist();
+  }
   res.json(snapshot());
 });
 app.post('/api/brain/start',async(_req,res)=>{await brain.start();res.json(snapshot());});

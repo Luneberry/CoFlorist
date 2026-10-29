@@ -15,6 +15,7 @@ import numpy as np
 
 b2.prefs.codegen.target = "numpy"
 PROTOCOL = sys.stdout
+MN9_ID = "720575940660219265"
 
 
 def emit(value: dict) -> None:
@@ -132,6 +133,7 @@ def simulate(data: dict, data_hash: str, payload: dict) -> dict:
         "activeNeurons": int(np.count_nonzero(counts)),
         "meanRateHz": round(float(rates.mean()), 4),
         "downstreamRateHz": round(float(rates[downstream].mean()), 4) if downstream else 0,
+        "mn9RateHz": round(float(rates[index[MN9_ID]]), 4) if MN9_ID in index else None,
         "nodes": node_rates, "nodeRates": node_rates, "edges": graph_edges,
         "traces": [{"timeMs": round(float(bins[i]), 2), "spikes": int(value)}
                    for i, value in enumerate(histogram)],

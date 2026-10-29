@@ -11,15 +11,19 @@ Brian2 2.9 creates a Windows CPU cache in the user's home during import, before 
 
 ## Setup
 
+On macOS, install Node.js 24 and Python 3.13, then run `sh scripts/setup-brain-macos.sh`. The script creates a project-local `.venv`, installs pinned packages, downloads the pinned upstream data, prepares the 384-neuron subset, and runs a real numerical smoke test. It uses `uv` if available, or the virtual environment's `pip`. Set `COFLORIST_PYTHON` to a different Python 3.13 executable if needed. The Node 24 Homebrew keg can be used without changing the system default: `/opt/homebrew/opt/node@24/bin/node`.
+
 On Windows, run `powershell -File scripts/setup-brain.ps1`, passing `-PythonExecutable` if the default bundled Python path is not available. The script creates only the workspace `.venv`, installs `python/requirements.txt`, and downloads pinned upstream files. The prepared source data is about 90 MB. The normal application does not download anything or require Python network access.
 
-Default worker paths are `<project>/.venv/Scripts/python.exe` and `<project>/data/flywire/subset.json`. The settings UI may point at another prepared data file or its containing directory. Run `node python/test-brain-worker.mjs` for a real numerical smoke test.
+Default worker paths are `<project>/.venv/bin/python` on macOS (or `.venv/Scripts/python.exe` on Windows) and `<project>/data/flywire/subset.json`. The settings UI may point at another prepared data file or its containing directory. Run `node python/test-brain-worker.mjs` for a real numerical smoke test.
+
+The dialogue demonstration keeps the upstream neuron connections fixed. A separate application rule maps each assistant message's `stimulus_hz` to 200 ms of simulated input and maps measured downstream firing into a **wait / reach / offer** display badge. See [the measured sweep](../docs/FLORA_BRAIN_SWEEP.md). MN9 is pinned as a readout when present in the source table; pinning it changes the exact induced edge count compared with earlier generated subsets.
 
 ## Runtime contract
 
 Express uses `BrainWorker` from `server/brain-worker.js`; `start()`, `run(payload)`, `stop()` and `snapshot()` never use a shell. `run()` accepts `stimulusHz` (0–250, default 100), `durationMs` (50–500, default 200), an integer `seed` and optional `silenceIds` containing known string IDs. Outgoing connections of silenced neurons are zeroed for that trial only. Each trial starts from resting state. `stdout` is JSONL only, protocol/library logs go to `stderr`. Queue length is bounded to eight waiting jobs; startup and queued/computing jobs have timeouts. Stopping a worker rejects all outstanding jobs.
 
-Python uses Brian2 with NumPy code generation to avoid a compiler installation. The model preserves the upstream membrane, synapse, delay and threshold constants and its Poisson stimulus method. Its reset statement includes only existing neuron state (`v`, `g`); upstream also contains an unused/unbound `w = 0` reset assignment. Python 3.12/Brian2 2.9 compatibility is validated locally; this is an adaptation, not a bit-for-bit reproduction of the older upstream environment.
+Python uses Brian2 with NumPy code generation to avoid a compiler installation. The model preserves the upstream membrane, synapse, delay and threshold constants and its Poisson stimulus method. Its reset statement includes only existing neuron state (`v`, `g`); upstream also contains an unused/unbound `w = 0` reset assignment. Python 3.13/Brian2 2.9 was validated on macOS, following earlier Python 3.12 validation on Windows; this is an adaptation, not a bit-for-bit reproduction of the older upstream environment.
 
 `nodes`, `edges`, `spikes` and histogram `traces` contain measured values. Display output is bounded (64 most active neurons, up to 256 edges among those neurons, first 1000 spikes). Full-circuit neuron/edge counts and aggregate firing rates are calculated over all 384 nodes. Original FlyWire IDs are always JSON strings because they exceed JavaScript's safe-integer range. A simulation's `durationMs` is simulated biological time; `wallTimeMs` is measured computation time.
 

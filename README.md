@@ -4,7 +4,7 @@ A local Korean conversation dashboard for arranging flowers with an operator-ass
 
 ## Run
 
-Use **Node.js 24**, a recent desktop Chrome or Edge, and a Nebius Token Factory key with access to a NVIDIA Nemotron model.
+Use **Node.js 24**, a recent desktop Chrome or Edge, and a Nebius Token Factory key with access to a NVIDIA Nemotron model. On macOS, Homebrew's keg-only Node 24 can be invoked at `/opt/homebrew/opt/node@24/bin/node` without switching the default Node version.
 
 ```powershell
 npm install
@@ -19,7 +19,7 @@ Keys entered in Settings stay in server memory and must be entered again after r
 
 ## Prepare the brain worker
 
-The current workspace already has the Python environment and prepared data. On another Windows machine, run:
+On macOS, run `sh scripts/setup-brain-macos.sh` with Python 3.13 and `uv` (or `pip`) available. On Windows, run:
 
 ```powershell
 powershell -File scripts/setup-brain.ps1 -PythonExecutable "C:\path\to\python.exe"
@@ -28,7 +28,9 @@ node python/test-brain-worker.mjs
 
 The setup creates `.venv`, installs pinned packages and downloads about 90 MB of upstream sources/data. It builds `data/flywire/subset.json` and a provenance manifest. It does not modify the supplied base Python runtime. In **설정 → 초파리 신경망**, use `.venv\Scripts\python.exe` and `data\flywire\subset.json` from this project, then start and test the worker. The application fills in absolute defaults.
 
-This is a **384-neuron isolated subset with 20,516 real connections**, not the entire fly brain. Dialogue-to-stimulus and activity-to-action rules are engineered mappings; preference/failure records are application memory, not neural learning. See [the worker notes](python/README.md) and [implementation details](docs/IMPLEMENTATION.md).
+This is a **384-neuron isolated subset with 20,407 real connections** in the current pinned-MN9 preparation, not the entire fly brain. Dialogue-to-stimulus and activity-to-action rules are engineered mappings; preference/failure records are application memory, not neural learning. See [the worker notes](python/README.md), [measured input sweep](docs/FLORA_BRAIN_SWEEP.md), and [implementation details](docs/IMPLEMENTATION.md).
+
+For the device dialogue feed, open **설정 → 외부 대화**, enter the local SSE endpoint, and connect. Each assistant event with `stimulus_hz` runs a fresh 200 ms trial using the assistant turn number as the seed; the reply bubble shows active neurons, downstream rate, MN9 rate, and a display-only wait/reach/offer badge. A nonempty `flower_color` adds a pending placement, which the operator must confirm through the existing controls. The sweetness bar shows the latest input rate and the sparkline shows measured downstream rates across turns. To check without a device, run `node examples/conversation-stream.mjs --demo` in another terminal and connect to its local `/events` endpoint. The example sends two synthetic dialogue turns, but the brain calculation uses the prepared real FlyWire subset.
 
 ## 시연 순서
 
