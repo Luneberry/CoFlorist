@@ -1,0 +1,20 @@
+diff --git a/t5_os/ap/components/lwip_intf_v2_1/lwip-2.1.2/src/core/tcp.c b/t5_os/ap/components/lwip_intf_v2_1/lwip-2.1.2/src/core/tcp.c
+index 47d1123f..04bcf83c 100755
+--- a/t5_os/ap/components/lwip_intf_v2_1/lwip-2.1.2/src/core/tcp.c
++++ b/t5_os/ap/components/lwip_intf_v2_1/lwip-2.1.2/src/core/tcp.c
+@@ -378,13 +378,13 @@ tcp_close_shutdown(struct tcp_pcb *pcb, u8_t rst_on_unacked_data)
+   }
+ 
+ // Modified by TUYA Start
+-// #if LWIP_TUYA_TCP_CLOSE_RST
++#if defined(LWIP_TUYA_TCP_CLOSE_RST) && LWIP_TUYA_TCP_CLOSE_RST
+   //tuya-tcp连接关闭，不走4次挥手，直接发RST关闭tcp连接
+   if ((pcb != NULL) && (pcb->state != LISTEN)) {
+       tcp_abort(pcb);
+       return ERR_OK;
+   }
+-// #endif
++#endif
+ // Modified by TUYA End
+ 
+   /* - states which free the pcb are handled here,

@@ -1,0 +1,102 @@
+{
+  "display": {
+    "width": 320,
+    "height": 480,
+    "orientation": "portrait",
+    "driver": "ILI9488",
+    "verification": "driver path in flash backup + active RGB boot log; panel dimensions from matching standard board config"
+  },
+  "atlas": {
+    "file": "cat-expressions-dark-1280x1920.png",
+    "columns": 4,
+    "rows": 4
+  },
+  "expressions": {
+    "neutral": {
+      "frames": [
+        "frames-dark-v2/neutral-0.png",
+        "frames-dark-v2/neutral-1.png"
+      ],
+      "durations_ms": [
+        1400,
+        160
+      ]
+    },
+    "happy": {
+      "frames": [
+        "frames-dark-v2/happy-0.png",
+        "frames-dark-v2/happy-1.png"
+      ],
+      "durations_ms": [
+        700,
+        700
+      ]
+    },
+    "sad": {
+      "frames": [
+        "frames-dark-v2/sad-0.png",
+        "frames-dark-v2/sad-1.png"
+      ],
+      "durations_ms": [
+        700,
+        700
+      ]
+    },
+    "angry": {
+      "frames": [
+        "frames-dark-v2/angry-0.png",
+        "frames-dark-v2/angry-1.png"
+      ],
+      "durations_ms": [
+        700,
+        700
+      ]
+    },
+    "surprised": {
+      "frames": [
+        "frames-dark-v2/surprised-0.png",
+        "frames-dark-v2/surprised-1.png"
+      ],
+      "durations_ms": [
+        700,
+        700
+      ]
+    },
+    "thinking": {
+      "frames": [
+        "frames-dark-v2/thinking-0.png",
+        "frames-dark-v2/thinking-1.png"
+      ],
+      "durations_ms": [
+        700,
+        700
+      ]
+    },
+    "listening": {
+      "frames": [
+        "frames-dark-v2/listening-0.png",
+        "frames-dark-v2/listening-1.png"
+      ],
+      "durations_ms": [
+        700,
+        700
+      ]
+    },
+    "speaking": {
+      "frames": [
+        "frames-dark-v2/speaking-0.png",
+        "frames-dark-v2/speaking-1.png"
+      ],
+      "durations_ms": [
+        300,
+        300
+      ]
+    }
+  },
+  "background": {
+    "style": "dark charcoal",
+    "requested_color": "#151A24",
+    "generator": "built-in image_gen edit",
+    "prompt": "imagegen-dark-v2-prompt.txt"
+  }
+}

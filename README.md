@@ -36,7 +36,11 @@ For the device dialogue feed, open **설정 → 외부 대화**, enter the local
 
 ### Pluggable conversation server
 
-CoFlorist accepts any conversation server that follows the [external SSE feed contract](docs/EXTERNAL_FEED_CONTRACT.md). The conversation server can be replaced without changing the dashboard: it supplies dialogue, flower colour and stimulus Hz, while CoFlorist runs the circuit and shows operator suggestions. To inspect the full contract without a device or model key, run `node examples/conversation-stream.mjs --flora` and connect **설정 → 외부 대화** to its local `/events` endpoint. This replays the [synthetic four-turn sample](examples/flora-feed-sample.json) with stable event IDs, including WAIT, OFFER, REACH and an error state. The Flora DUO server is a separate reference implementation; its repository link can be added when public.
+CoFlorist accepts any conversation server that follows the [external SSE feed contract](docs/EXTERNAL_FEED_CONTRACT.md). The conversation server can be replaced without changing the dashboard: it supplies dialogue, flower colour and stimulus Hz, while CoFlorist runs the circuit and shows operator suggestions. To inspect the full contract without a device or model key, run `node examples/conversation-stream.mjs --flora` and connect **설정 → 외부 대화** to its local `/events` endpoint. This replays the [synthetic four-turn sample](examples/flora-feed-sample.json) with stable event IDs, including WAIT, OFFER, REACH and an error state.
+
+### Flora device + server (reference implementation)
+
+The cat device and conversation server shown in the demo video are included under [`flora/`](flora/README.md). `flora/server/` is one reference implementation of the external SSE contract; a team can replace it with its own Nebius-based conversation server while keeping this dashboard. See the Flora README for server, firmware and device setup.
 
 ## 시연 순서
 
@@ -65,3 +69,7 @@ Nonsecret settings, the latest session snapshot and audit events are stored in `
 - [NVIDIA Nemotron 3 Super](https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b/build): the default NVIDIA model family; model/provider terms apply separately.
 - [Drosophila brain model](https://github.com/philshiu/Drosophila_brain_model/tree/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960): copyright © 2023 Philip Shiu and Nico Spiller, MIT license. The upstream license is preserved in `data/flywire/source/LICENSE`; source URLs and SHA-256 hashes are in `data/flywire/manifest.json`.
 - [Brian2](https://brian2.readthedocs.io/): neural simulation; [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API): browser speech input/output.
+
+## License
+
+CoFlorist is MIT-licensed (see `LICENSE`). The `flora/` reference implementation is MIT-licensed under its own `LICENSE`, except for TuyaOpen-derived files that remain Apache-2.0; see [`flora/THIRD_PARTY_NOTICES.md`](flora/THIRD_PARTY_NOTICES.md).
