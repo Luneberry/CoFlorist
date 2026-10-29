@@ -36,7 +36,7 @@ Nemotron 3 Ultra and 3.5 Super VL were not measured; by size and price they are 
 - **A catalog we could A/B in minutes.** `GET /v1/models` lists every Nemotron variant; we ran the identical florist prompt against Nano-30B-A3B and 3.5 Lightning on the same endpoint and picked by measured Korean quality and latency.
 - **Control over reasoning at the API level.** Token Factory passes `chat_template_kwargs.enable_thinking=false` through, which turned a reasoning model into a ~0.7 s spoken-reply model without touching the prompt. With thinking on, the same request spent its whole token budget on a hidden thinking process and returned no answer — we saw this and fixed it with one body field.
 - **Reliable structured output.** `response_format: {"type": "json_object"}` is honoured. The server still validates the JSON and falls back safely (`parse_reply` in `openai_chat.py`), but in our runs the schema was kept.
-- **Pay-per-token with trial credit.** The live API work — model comparison, prompt iteration, the real dashboard runs — fit inside the initial $1 trial credit. The 170 automated tests use fake providers and make no API calls.
+- **Pay-per-token with trial credit.** The live API work — model comparison, prompt iteration, the real dashboard runs — fit inside the initial $1 trial credit. The 175 automated tests use fake providers and make no API calls.
 - **One model family across the project.** The dashboard (CoFlorist) has an optional, separate Nemotron chat mode that also runs on Token Factory. Flora's external-feed path does not make a second model call: the dashboard only receives the server's result and runs the circuit.
 
 In the submitted configuration speech recognition and synthesis use Gemini (a third-party API used alongside the required stack). An NVIDIA Nemotron ASR provider (`providers/nvidia_asr.py`) is implemented but was not used in the demo.
@@ -45,7 +45,7 @@ In the submitted configuration speech recognition and synthesis use Gemini (a th
 
 | Path | What |
 |---|---|
-| `server/` | DUO server (FastAPI). xiaozhi-compatible device protocol, Nemotron/Gemini providers, text chat page, registration, SSE feed for the dashboard. 170 tests. |
+| `server/` | DUO server (FastAPI). xiaozhi-compatible device protocol, Nemotron/Gemini providers, text chat page, registration, SSE feed for the dashboard. 175 tests. |
 | `firmware/pusheen_cat/` | Cat firmware (TuyaOpen app for T5AI). QR setup, VAD, Opus, display, USB bridge. |
 | `firmware/patches/` | Two small SDK patches required to build/run. |
 | `assets/` | Cat expression frames (8 emotions × 2) and the image-generation prompts. |
@@ -58,7 +58,7 @@ In the submitted configuration speech recognition and synthesis use Gemini (a th
 brew install opus          # libopus
 cd server && uv sync
 cp .env.example .env       # fill NEBIUS_API_KEY and GEMINI_API_KEY; set DUO_LLM=nemotron
-uv run pytest -q           # 170 passed
+uv run pytest -q           # 175 passed
 uv run python -m duo_server
 ```
 
