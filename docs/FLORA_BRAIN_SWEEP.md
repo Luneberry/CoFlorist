@@ -21,6 +21,6 @@ Reproduce with `.venv/bin/python python/sweep_stimulus.py`. Each row is the mean
 
 ## Display policy
 
-The application uses **wait** below 1.0 downstream Hz, **reach** from 1.0 to below 7.0 Hz, and **offer** at 7.0 Hz or above. In this sweep, the 20 Hz trials remained below 1.0, the 40–60 Hz trials fell between 1.0 and 7.0, and the 80 Hz and higher trials exceeded 7.0. These thresholds are an app-defined display mapping for operator discussion. They are not a biological claim, robot command, or safety decision. Only the existing operator controls can advance a flower placement.
+The application uses **wait** below 1.0 downstream Hz, **offer** at 1.0 downstream Hz or above, and **reach** when the MN9 readout reaches 15 Hz. If MN9 is absent from a different prepared subset, reach instead requires 7.0 downstream Hz. In this sweep, all 20 Hz trials stayed in wait; all 40–60 Hz trials stayed in offer; all 80 Hz and higher trials reached the MN9 threshold. At 60 Hz, MN9 was 0, 5, and 10 Hz across seeds 1–3; at 80 Hz it was 35, 20, and 40 Hz. The 15 Hz cutoff separates these sampled runs. These thresholds are an app-defined display mapping for operator discussion. They are not a biological claim, robot command, or safety decision. Only the existing operator controls can advance a flower placement.
 
 MN9 is a named readout pinned into the isolated subset. Its rate should not be interpreted as a verified complete motor pathway because connections beyond the subset are omitted. The 200 ms window means each neuron rate changes in 5 Hz increments per spike.

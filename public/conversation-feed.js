@@ -5,9 +5,10 @@ export function createFeedState() {
 const COLORS = new Set(['', 'white', 'red', 'yellow', 'purple']);
 
 // These are application display rules; the circuit does not infer intent or emotion.
-export function brainBadge(rateHz, reachThreshold, offerThreshold) {
-  if (!Number.isFinite(rateHz)) return 'wait';
-  return rateHz >= offerThreshold ? 'offer' : rateHz >= reachThreshold ? 'reach' : 'wait';
+export function brainBadge(downstreamRateHz, mn9RateHz, { mn9ReachHz, downstreamOfferHz, fallbackReachHz }) {
+  if (Number.isFinite(mn9RateHz) && mn9RateHz >= mn9ReachHz) return 'reach';
+  if (!Number.isFinite(mn9RateHz) && Number.isFinite(downstreamRateHz) && downstreamRateHz >= fallbackReachHz) return 'reach';
+  return Number.isFinite(downstreamRateHz) && downstreamRateHz >= downstreamOfferHz ? 'offer' : 'wait';
 }
 
 // The stream carries display events only: never robot commands or model prompts.

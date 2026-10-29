@@ -24,9 +24,13 @@ test('assistant stimulus and flower survive replay deduplication with stable tur
   assert.equal(applyFeedEvent(state, second), true);
   assert.deepEqual(state.messages.map(item => [item.turn, item.stimulusHz, item.flowerColor]), [[1, 60, 'white'], [2, 120, 'red']]);
   assert.equal(state.turnCount, 2);
-  assert.equal(brainBadge(0, 1, 5), 'wait');
-  assert.equal(brainBadge(3, 1, 7), 'reach');
-  assert.equal(brainBadge(7, 1, 7), 'offer');
+  const thresholds = { mn9ReachHz: 15, downstreamOfferHz: 1, fallbackReachHz: 7 };
+  assert.equal(brainBadge(0.5, 0, thresholds), 'wait');
+  assert.equal(brainBadge(4.4, 0, thresholds), 'offer');
+  assert.equal(brainBadge(5.9, 10, thresholds), 'offer');
+  assert.equal(brainBadge(8, 20, thresholds), 'reach');
+  assert.equal(brainBadge(8, null, thresholds), 'reach');
+  assert.equal(brainBadge(3, null, thresholds), 'offer');
 });
 
 test('invalid events cannot change displayed state or run operator actions', () => {

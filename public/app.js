@@ -23,8 +23,7 @@ let externalFeed = createFeedState();
 let externalSilenceTimer = null;
 let externalBrainQueue = Promise.resolve();
 // Calibrated with the local 384-neuron subset; see docs/FLORA_BRAIN_SWEEP.md.
-const REACH_RATE_HZ = 1;
-const OFFER_RATE_HZ = 7;
+const BRAIN_BADGE_THRESHOLDS = { mn9ReachHz: 15, downstreamOfferHz: 1, fallbackReachHz: 7 };
 let selectedVoice = '';
 let voices = [];
 let chatInFlight = false;
@@ -392,7 +391,7 @@ function connectExternalFeed(url) {
                 activeNeurons: result.activeNeurons,
                 downstreamRateHz: result.downstreamRateHz,
                 mn9RateHz: result.mn9RateHz,
-                badge: brainBadge(result.downstreamRateHz, REACH_RATE_HZ, OFFER_RATE_HZ),
+                badge: brainBadge(result.downstreamRateHz, result.mn9RateHz, BRAIN_BADGE_THRESHOLDS),
               };
               message.analysisStatus = 'complete';
               feed.samples.push({ turn: message.turn, downstreamRateHz: result.downstreamRateHz });

@@ -30,6 +30,8 @@ The setup creates `.venv`, installs pinned packages and downloads about 90 MB of
 
 This is a **384-neuron isolated subset with 20,407 real connections** in the current pinned-MN9 preparation, not the entire fly brain. Dialogue-to-stimulus and activity-to-action rules are engineered mappings; preference/failure records are application memory, not neural learning. See [the worker notes](python/README.md), [measured input sweep](docs/FLORA_BRAIN_SWEEP.md), and [implementation details](docs/IMPLEMENTATION.md).
 
+If you prepared `data/flywire/` before the MN9 pinning change, rerun `python/prepare_data.py` (or the setup script) before starting the worker. The generated subset and its SHA-256 manifest change when MN9 is included.
+
 For the device dialogue feed, open **설정 → 외부 대화**, enter the local SSE endpoint, and connect. Each assistant event with `stimulus_hz` runs a fresh 200 ms trial using the assistant turn number as the seed; the reply bubble shows active neurons, downstream rate, MN9 rate, and a display-only wait/reach/offer badge. A nonempty `flower_color` adds a pending placement, which the operator must confirm through the existing controls. The sweetness bar shows the latest input rate and the sparkline shows measured downstream rates across turns. To check without a device, run `node examples/conversation-stream.mjs --demo` in another terminal and connect to its local `/events` endpoint. The example sends two synthetic dialogue turns, but the brain calculation uses the prepared real FlyWire subset.
 
 ## 시연 순서
