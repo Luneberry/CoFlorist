@@ -1,0 +1,27 @@
+[project]
+name = "duo-server"
+version = "0.1.0"
+description = "DUO 기기와 음성을 주고받는 서버 (음성→글 → 답변 → 글→음성)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "google-genai>=2.0",
+    "nvidia-riva-client>=2.17",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false

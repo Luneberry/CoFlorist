@@ -11,3 +11,20 @@ data/
 output/
 assets/references/
 *.log
+# secrets and runtime data — never commit
+flora/server/.env
+flora/server/.env.*
+!flora/server/.env.example
+flora/server/data/
+flora/server/logs/
+flora/firmware/pusheen_cat/src/cat_profile_private.h
+
+# build outputs / environments
+flora/server/.venv/
+**/__pycache__/
+**/.pytest_cache/
+flora/firmware/pusheen_cat/.build/
+flora/firmware/pusheen_cat/dist/
+flora/firmware/pusheen_cat/src/portal_web_assets.c
+flora/firmware/pusheen_cat/src/portal_web_assets.h
+.DS_Store

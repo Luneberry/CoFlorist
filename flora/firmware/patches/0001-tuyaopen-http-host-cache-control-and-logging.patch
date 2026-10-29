@@ -1,0 +1,62 @@
+diff --git a/src/libhttp/src/http_host.c b/src/libhttp/src/http_host.c
+index 10a9f4a..73fcae7 100644
+--- a/src/libhttp/src/http_host.c
++++ b/src/libhttp/src/http_host.c
+@@ -137,6 +137,7 @@ static OPERATE_RET __http_host_send_all(int fd, const char *data, uint32_t len)
+     while (sent < len) {
+         int ret = tal_net_send(fd, data + sent, len - sent);
+         if (ret <= 0) {
++            PR_ERR("http_host send failed result=%d sent=%u total=%u", ret, sent, len);
+             return OPRT_SEND_ERR;
+         }
+         sent += (uint32_t)ret;
+@@ -311,9 +312,11 @@ OPERATE_RET http_host_reply(int client_fd, const char *status, const char *conte
+                    "HTTP/1.1 %s\r\n"
+                    "Content-Type: %s\r\n"
+                    "Content-Length: %u\r\n"
++                   "Cache-Control: no-store\r\n"
+                    "Connection: close\r\n\r\n",
+                    status, content_type, body_len);
+ 
++    PR_WARN("http_host response header_bytes=%u body_bytes=%u", (unsigned)strlen(hdr), body_len);
+     rt = __http_host_send_all(client_fd, hdr, (uint32_t)strlen(hdr));
+     if (rt != OPRT_OK) {
+         return rt;
+@@ -354,9 +357,11 @@ OPERATE_RET http_host_reply_redirect(int client_fd, const char *location)
+                    "Location: %s\r\n"
+                    "Content-Type: text/html; charset=utf-8\r\n"
+                    "Content-Length: %u\r\n"
++                   "Cache-Control: no-store\r\n"
+                    "Connection: close\r\n\r\n",
+                    location, body_len);
+ 
++    PR_WARN("http_host response header_bytes=%u body_bytes=%u", (unsigned)strlen(hdr), body_len);
+     rt = __http_host_send_all(client_fd, hdr, (uint32_t)strlen(hdr));
+     if (rt != OPRT_OK) {
+         return rt;
+@@ -492,6 +497,7 @@ static void __http_host_task(void *arg)
+ 
+     rt = tal_net_set_reuse(ctx->listen_fd);
+     if (rt != OPRT_OK) {
++        PR_ERR("http_host reuse failed result=%d", rt);
+         goto __EXIT;
+     }
+ 
+@@ -499,14 +505,16 @@ static void __http_host_task(void *arg)
+     TUYA_CALL_ERR_LOG(tal_net_set_timeout(ctx->listen_fd, ctx->cfg.listen_send_timeout_ms, TRANS_SEND));
+     rt = tal_net_bind(ctx->listen_fd, TY_IPADDR_ANY, ctx->cfg.port);
+     if (rt != OPRT_OK) {
++        PR_ERR("http_host bind failed result=%d", rt);
+         goto __EXIT;
+     }
+ 
+     rt = tal_net_listen(ctx->listen_fd, ctx->cfg.backlog);
+     if (rt != OPRT_OK) {
++        PR_ERR("http_host listen failed result=%d", rt);
+         goto __EXIT;
+     }
+-    PR_NOTICE("http_host started at port %u", ctx->cfg.port);
++    PR_WARN("http_host listener ready port=%u", ctx->cfg.port);
+ 
+     while ((ctx->stop_requested == FALSE) && (ctx->shutdown_requested == FALSE)) {
+         TUYA_IP_ADDR_T client_addr = 0;
