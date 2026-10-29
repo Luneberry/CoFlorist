@@ -1,0 +1,156 @@
+{
+ "note": "Synthetic sample in the external feed contract shape (no real dialogue, no secrets). Replay with: node examples/conversation-stream.mjs --flora",
+ "events": [
+  {
+   "id": "flora-sample-0001",
+   "type": "state",
+   "state": "listening",
+   "at": "2025-10-29T15:00:04+09:00"
+  },
+  {
+   "id": "flora-sample-0002",
+   "type": "message",
+   "role": "user",
+   "text": "안녕! 너 누구야?",
+   "at": "2025-10-29T15:00:08+09:00"
+  },
+  {
+   "id": "flora-sample-0003",
+   "type": "state",
+   "state": "thinking",
+   "at": "2025-10-29T15:00:12+09:00"
+  },
+  {
+   "id": "flora-sample-0004",
+   "type": "message",
+   "role": "assistant",
+   "text": "저는 꽃집 고양이 플로라예요. 오늘 기분이 어때요?",
+   "flower": "",
+   "flower_color": "",
+   "emotion": "happy",
+   "stimulus_hz": 20,
+   "at": "2025-10-29T15:00:16+09:00"
+  },
+  {
+   "id": "flora-sample-0005",
+   "type": "state",
+   "state": "speaking",
+   "at": "2025-10-29T15:00:20+09:00"
+  },
+  {
+   "id": "flora-sample-0006",
+   "type": "state",
+   "state": "idle",
+   "at": "2025-10-29T15:00:24+09:00"
+  },
+  {
+   "id": "flora-sample-0007",
+   "type": "state",
+   "state": "listening",
+   "at": "2025-10-29T15:00:28+09:00"
+  },
+  {
+   "id": "flora-sample-0008",
+   "type": "message",
+   "role": "user",
+   "text": "오늘 면접을 망쳐서 너무 우울해.",
+   "at": "2025-10-29T15:00:32+09:00"
+  },
+  {
+   "id": "flora-sample-0009",
+   "type": "state",
+   "state": "thinking",
+   "at": "2025-10-29T15:00:36+09:00"
+  },
+  {
+   "id": "flora-sample-0010",
+   "type": "message",
+   "role": "assistant",
+   "text": "많이 속상했겠어요. 위로의 마음을 담은 흰 백합 어때요?",
+   "flower": "백합",
+   "flower_color": "white",
+   "emotion": "sad",
+   "stimulus_hz": 60,
+   "at": "2025-10-29T15:00:40+09:00"
+  },
+  {
+   "id": "flora-sample-0011",
+   "type": "state",
+   "state": "speaking",
+   "at": "2025-10-29T15:00:44+09:00"
+  },
+  {
+   "id": "flora-sample-0012",
+   "type": "state",
+   "state": "idle",
+   "at": "2025-10-29T15:00:48+09:00"
+  },
+  {
+   "id": "flora-sample-0013",
+   "type": "state",
+   "state": "listening",
+   "at": "2025-10-29T15:00:52+09:00"
+  },
+  {
+   "id": "flora-sample-0014",
+   "type": "message",
+   "role": "user",
+   "text": "동생이 대학에 붙었어! 축하해 주고 싶어.",
+   "at": "2025-10-29T15:00:56+09:00"
+  },
+  {
+   "id": "flora-sample-0015",
+   "type": "state",
+   "state": "thinking",
+   "at": "2025-10-29T15:01:00+09:00"
+  },
+  {
+   "id": "flora-sample-0016",
+   "type": "message",
+   "role": "assistant",
+   "text": "대학 합격 정말 축하드려요! 기쁨을 나누는 노란 튤립을 추천해요.",
+   "flower": "튤립",
+   "flower_color": "yellow",
+   "emotion": "happy",
+   "stimulus_hz": 120,
+   "at": "2025-10-29T15:01:04+09:00"
+  },
+  {
+   "id": "flora-sample-0017",
+   "type": "state",
+   "state": "speaking",
+   "at": "2025-10-29T15:01:08+09:00"
+  },
+  {
+   "id": "flora-sample-0018",
+   "type": "state",
+   "state": "idle",
+   "at": "2025-10-29T15:01:12+09:00"
+  },
+  {
+   "id": "flora-sample-0019",
+   "type": "state",
+   "state": "listening",
+   "at": "2025-10-29T15:01:16+09:00"
+  },
+  {
+   "id": "flora-sample-0020",
+   "type": "message",
+   "role": "user",
+   "text": "그냥 날씨 얘기나 하자.",
+   "at": "2025-10-29T15:01:20+09:00"
+  },
+  {
+   "id": "flora-sample-0021",
+   "type": "state",
+   "state": "thinking",
+   "at": "2025-10-29T15:01:24+09:00"
+  },
+  {
+   "id": "flora-sample-0022",
+   "type": "state",
+   "state": "error",
+   "at": "2025-10-29T15:01:28+09:00"
+  }
+ ]
+}

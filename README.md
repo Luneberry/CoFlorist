@@ -34,6 +34,10 @@ If you prepared `data/flywire/` before the MN9 pinning change, rerun `python/pre
 
 For the device dialogue feed, open **설정 → 외부 대화**, enter the local SSE endpoint, and connect. Each assistant event with `stimulus_hz` runs a fresh 200 ms trial using the assistant turn number as the seed; the reply bubble shows active neurons, downstream rate, MN9 rate, and a display-only wait/reach/offer badge. A nonempty `flower_color` adds a pending placement, which the operator must confirm through the existing controls. The sweetness bar shows the latest input rate and the sparkline shows measured downstream rates across turns. To check without a device, run `node examples/conversation-stream.mjs --demo` in another terminal and connect to its local `/events` endpoint. The example sends two synthetic dialogue turns, but the brain calculation uses the prepared real FlyWire subset.
 
+### Pluggable conversation server
+
+CoFlorist accepts any conversation server that follows the [external SSE feed contract](docs/EXTERNAL_FEED_CONTRACT.md). The conversation server can be replaced without changing the dashboard: it supplies dialogue, flower colour and stimulus Hz, while CoFlorist runs the circuit and shows operator suggestions. To inspect the full contract without a device or model key, run `node examples/conversation-stream.mjs --flora` and connect **설정 → 외부 대화** to its local `/events` endpoint. This replays the [synthetic four-turn sample](examples/flora-feed-sample.json) with stable event IDs, including WAIT, OFFER, REACH and an error state. The Flora DUO server is a separate reference implementation; its repository link can be added when public.
+
 ## 시연 순서
 
 1. **설정**에서 받는 사람과 이전 이야기를 저장하세요. 만들어 넣은 사례라면 **시연용 예시 이야기**를 표시하세요. 근거가 없으면 모델이 취향을 확인하도록 되어 있습니다.

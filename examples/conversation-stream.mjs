@@ -7,12 +7,14 @@
  *
  * 단독 서버: node examples/conversation-stream.mjs
  * 로컬 UI 확인용 가상 대화: node examples/conversation-stream.mjs --demo
+ * 서버 교체 계약의 4턴 샘플 재생: node examples/conversation-stream.mjs --flora
  * 기본 바인딩은 127.0.0.1. 다른 기기 연결 시 HOST에 서버의 LAN IP 설정.
  * 브라우저 출처는 ALLOWED_ORIGIN으로 명시 (기본 http://localhost:4317).
  * 이 파일은 상대가 쓸 참고 구현입니다. 로봇 명령을 처리하지 않습니다.
  */
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export function createConversationStream(app, { allowedOrigin = 'http://localhost:4317', onClient = () => {} } = {}) {
@@ -52,9 +54,19 @@ export function createConversationStream(app, { allowedOrigin = 'http://localhos
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const app = express();
   let demoStarted = false;
+  const floraMode = process.argv.includes('--flora');
+  const floraEvents = floraMode
+    ? JSON.parse(readFileSync(new URL('./flora-feed-sample.json', import.meta.url), 'utf8')).events
+    : null;
   createConversationStream(app, {
     allowedOrigin: process.env.ALLOWED_ORIGIN || 'http://localhost:4317',
     onClient: publish => {
+      if (floraMode) {
+        if (demoStarted) return;
+        demoStarted = true;
+        floraEvents.forEach((event, index) => setTimeout(() => publish(event), index * 1200));
+        return;
+      }
       if (!process.argv.includes('--demo') || demoStarted) return;
       demoStarted = true;
       const send = event => publish({ id: randomUUID(), ...event });

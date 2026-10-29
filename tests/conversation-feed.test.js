@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createFeedState, applyFeedEvent, brainBadge } from '../public/conversation-feed.js';
 
 test('external conversation displays text and states without duplicating reconnect events', () => {
@@ -44,4 +45,16 @@ test('invalid events cannot change displayed state or run operator actions', () 
     assert.throws(() => applyFeedEvent(state, event));
     assert.deepEqual(state, createFeedState());
   }
+});
+
+test('pluggable Flora sample follows the feed contract with three circuit turns', () => {
+  const { events } = JSON.parse(readFileSync(new URL('../examples/flora-feed-sample.json', import.meta.url), 'utf8'));
+  const state = createFeedState();
+  assert.equal(new Set(events.map(event => event.id)).size, events.length);
+  for (const event of events) assert.equal(applyFeedEvent(state, event), true);
+  assert.equal(state.phase, 'error');
+  assert.deepEqual(state.messages.filter(message => message.role === 'assistant').map(message => message.stimulusHz), [20, 60, 120]);
+  assert.equal(state.turnCount, 3);
+  for (const event of events) assert.equal(applyFeedEvent(state, event), false);
+  assert.equal(state.turnCount, 3);
 });
