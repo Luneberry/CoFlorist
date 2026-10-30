@@ -58,17 +58,16 @@
 @media(max-width:800px){.conversation-card{height:690px}}
 @media(prefers-reduced-motion:reduce){.conversation-brain *{animation:none!important}}
 
-.external-flower,.external-neural-readout{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:9px;color:#59724b;flex-wrap:wrap}
-.external-flower .color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
-.external-neural-readout{color:#6c7963;line-height:1.5}
-.decision-badge{padding:3px 6px;border-radius:4px;background:#e3ead8;color:#436534;font-size:8px;letter-spacing:.04em}
-.decision-badge.offer{background:#e9e0c9;color:#705727}
-.decision-badge.wait{background:#eceee9;color:#65705e}
-.external-brain-metrics{margin-top:9px;padding-top:8px;border-top:1px solid #dce5d3}
-.external-brain-metrics[hidden]{display:none}
-.sweetness-heading,.turn-trend{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#60784f;font-size:8px}
-.sweetness-heading strong{font-size:9px;font-weight:600}
-.sweetness-track{height:5px;margin:5px 0 6px;background:#dce5d3;border-radius:9px;overflow:hidden}
-.sweetness-track span{display:block;height:100%;width:0;background:#b0a267;border-radius:9px;transition:width .3s}
-.turn-trend svg{width:100px;height:24px;overflow:visible}
 .brain-attribution{margin:8px 0 0;color:#829076;font-size:7px;line-height:1.4;text-align:center}
+
+/* Main conversation audio and the single environment-backed connection switch. */
+.connection-settings-card .settings-card-head{margin-bottom:14px}
+.connection-switch{margin-left:auto;flex:none;border:1px solid #cfd8c4;border-radius:30px;background:#e8ebe1;color:#6b7962;min-width:68px;padding:10px 18px;font-size:12px;font-weight:700;letter-spacing:.06em}
+.connection-switch[aria-checked=true]{background:var(--green);border-color:var(--green);color:#fffef4}
+.message-audio{display:flex;align-items:center;gap:9px;margin-top:8px;flex-wrap:wrap;color:#7b8770;font-size:9px}
+.message-audio-button{border:1px solid #dce3d2;background:#f1f4e9;border-radius:16px;color:#4c6740;padding:5px 9px;font-size:9px}
+.message-audio-button:hover{background:#e5ecd9}
+.message-audio-error{font-size:9px;color:#a07862;margin-top:8px;line-height:1.6}
+.reply-voice-status{color:#647d52;font-size:9px;line-height:1.5}
+.voice-status:empty{display:none}
+.chat-composer textarea:disabled{cursor:not-allowed;background:transparent;opacity:.65}

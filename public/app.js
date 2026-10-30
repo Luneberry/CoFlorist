@@ -1,4 +1,3 @@
-import { createFeedState, applyFeedEvent, brainBadge } from './conversation-feed.js';
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const colorNames = { white: '흰 꽃', red: '빨간 꽃', yellow: '노란 꽃', purple: '보라 꽃' };
@@ -12,28 +11,28 @@ let graphSignature = '';
 let toastTimer;
 let cameraStream = null;
 let cameraGeneration = 0;
-let recognition = null;
 let listening = false;
 let speaking = false;
 let speechGeneration = 0;
-let externalSource = null;
-let externalMode = false;
-let externalConnected = false;
-let externalFeed = createFeedState();
-let externalSilenceTimer = null;
-let externalBrainQueue = Promise.resolve();
-// Calibrated with the local 384-neuron subset; see docs/FLORA_BRAIN_SWEEP.md.
-const BRAIN_BADGE_THRESHOLDS = { mn9ReachHz: 15, downstreamOfferHz: 1, fallbackReachHz: 7 };
-let selectedVoice = '';
-let voices = [];
+let replyAudio = null;
+let playingMessageId = null;
+let playbackStatus = 'idle';
+let microphoneStream = null;
+let recorder = null;
+let micOpening = false;
+let micGeneration = 0;
+let recordingLimitTimer = null;
+let transcribing = false;
+let transcriptionController = null;
+let connectionChanging = false;
+const microphoneSupported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+const stageNames = { brain: '초파리 신경망 계산 중', responding: '신경망 결과로 답변을 만들고 있어요', synthesizing: '답변을 목소리로 바꾸고 있어요' };
 let chatInFlight = false;
 let chatGeneration = 0;
 let actionInFlight = false;
 let eventSource = null;
 let fallbackTimer = null;
 let spokenIds = new Set();
-let pendingSpeech = null;
-let discardRecognition = false;
 let localView = location.hash === '#settings' ? 'settings' : 'main';
 
 function toast(message, error = false) {
@@ -67,7 +66,6 @@ function navigate(page) {
     if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
   });
   history.replaceState(null, '', `#${localView}`);
-  if (localView === 'main' && externalMode) requestAnimationFrame(() => { const host = $('#messages'); host.scrollTop = host.scrollHeight; });
 }
 
 function setBadge(selector, text, status) {
@@ -84,36 +82,40 @@ function render(next) {
   const session = state.session;
   const settings = state.settings;
   const connection = state.connection || {};
-  const brain = state.brain || {};
-  const connectionReady = connection.status === 'ready';
+  const enabled = settings.connectionEnabled !== false;
+  const connectionReady = enabled && connection.status === 'ready';
   $('#system-dot').className = `status-dot${connectionReady ? ' ready' : connection.status === 'error' ? ' error' : ''}`;
-  $('#system-label').textContent = externalMode ? (externalConnected ? '외부 대화 연결됨' : '외부 대화 연결 중') : connectionReady ? 'Nebius 연결됨' : settings.apiConfigured ? '연결 확인 필요' : 'API 연결 전';
-  if (externalMode) $('#system-dot').className = `status-dot${externalConnected ? ' ready' : ' busy'}`;
-  $('#phase-label').textContent = session.busy ? '답변을 준비하고 있어요' : phaseNames[session.phase] || session.phase;
+  $('#system-label').textContent = !enabled ? '대화 연결 꺼짐' : connectionReady ? 'Nebius 연결됨' : settings.apiConfigured ? '대화 준비됨' : '서버 연결 설정 필요';
+  $('#phase-label').textContent = stageNames[session.processingStage] || (session.busy ? '답변을 준비하고 있어요' : phaseNames[session.phase] || session.phase);
   $('#phase-dot').className = `status-dot${session.busy ? ' busy' : session.phase === 'completed' ? ' ready' : ''}`;
-  setBadge('#connection-badge', connectionReady ? '연결됨' : connection.status === 'error' ? '연결 오류' : settings.apiConfigured ? '확인 대기' : '연결 전', connection.status);
-  $('#api-key').placeholder = settings.apiConfigured ? 'API 키 등록됨 · 변경할 때만 입력' : 'Nebius API 키 입력';
+  $('#connection-toggle').setAttribute('aria-checked', String(enabled));
+  $('#connection-toggle').textContent = enabled ? 'ON' : 'OFF';
+  $('#connection-toggle').disabled = connectionChanging;
+  $('#connection-feedback').textContent = !enabled ? '대화 연결이 꺼져 있어요.' : settings.apiConfigured ? '저장된 연결 설정을 사용해요.' : '서버의 .env에 API 키를 설정해 주세요.';
   $('#voice-toggle').setAttribute('aria-pressed', String(Boolean(settings.voiceEnabled)));
   $('#voice-enabled').checked = Boolean(settings.voiceEnabled);
   $('#voice-toggle').title = settings.voiceEnabled ? '음성 응답 끄기' : '음성 응답 켜기';
   $('#demo-memory-badge').hidden = !settings.historyIsDemo;
-  if (!settings.voiceEnabled) stopSpeaking();
+  if (((!settings.voiceEnabled && previous?.settings?.voiceEnabled !== false) || (!enabled && previous?.settings?.connectionEnabled !== false)) && replyAudio) stopSpeaking();
+  if (!enabled && (listening || micOpening || transcribing)) cancelRecording();
+  if (previous && previous.session.revision !== session.revision && (session.paused || !session.messages?.length)) {
+    stopSpeaking(); cancelRecording();
+  }
   if (first) {
     for (const message of session.messages || []) spokenIds.add(message.id);
     populateSettings(settings);
-  }
-  const latestAssistant = [...(session.messages || [])].reverse().find(message => message.role === 'assistant');
-  if (!first && latestAssistant && !spokenIds.has(latestAssistant.id)) {
-    spokenIds.add(latestAssistant.id);
-    if (settings.voiceEnabled && !externalMode) speak(latestAssistant.text);
   }
   renderMessages();
   renderPlacements();
   renderProgress();
   renderOperator();
   renderBrain();
-  renderExternalMetrics();
-  if (first || previous?.settings?.model !== settings.model) ensureModel(settings.model);
+  updateInputControls();
+  const latestAssistant = [...(session.messages || [])].reverse().find(message => message.role === 'assistant');
+  if (!first && latestAssistant?.audio && !spokenIds.has(latestAssistant.id)) {
+    spokenIds.add(latestAssistant.id);
+    if (settings.voiceEnabled && enabled && !listening && !micOpening && !transcribing) void playReply(latestAssistant);
+  }
   initialized = true;
 }
 
@@ -134,11 +136,8 @@ function populateSettings(settings) {
 }
 
 function renderMessages() {
-  const session = externalMode ? { messages: externalFeed.messages, busy: externalFeed.phase === 'thinking' } : state.session;
-  $('.conversation-footer').hidden = externalMode;
-  $('#voice-toggle').hidden = externalMode;
-  const signature = JSON.stringify([session.messages, session.busy]);
-  $('#send-button').disabled = chatInFlight || session.busy;
+  const session = state.session;
+  const signature = JSON.stringify([session.messages, session.busy, session.processingStage]);
   $('#quick-prompts').hidden = Boolean(session.messages?.length);
   if (signature === messagesSignature) return;
   messagesSignature = signature;
@@ -148,7 +147,7 @@ function renderMessages() {
   if (!session.messages?.length && !session.busy) {
     const empty = document.createElement('div'); empty.className = 'conversation-empty';
     const flower = document.createElement('div'); flower.className = 'empty-flower'; flower.textContent = '✳'; flower.setAttribute('aria-hidden', 'true');
-    const text = document.createElement('p'); text.textContent = externalMode ? '대화를 기다리고 있어요.' : '먼저 말을 걸어주세요.';
+    const text = document.createElement('p'); text.textContent = '메시지를 입력하거나 마이크로 말을 걸어주세요.';
     empty.append(flower, text); host.append(empty);
   }
   for (const item of session.messages || []) {
@@ -159,34 +158,25 @@ function renderMessages() {
     label.append(time);
     const body = document.createElement('p'); body.className = 'message-body'; body.textContent = item.text;
     message.append(label, body);
-    if (externalMode && item.role === 'assistant') {
-      if (item.flowerColor) {
-        const flower = document.createElement('div'); flower.className = 'external-flower';
-        const dot = document.createElement('i'); dot.className = `color-dot ${item.flowerColor}`;
-        const name = document.createElement('span'); name.textContent = item.flower || colorNames[item.flowerColor];
-        flower.append(dot, name); message.append(flower);
-      }
-      if (Number.isInteger(item.stimulusHz)) {
-        const readout = document.createElement('div'); readout.className = 'external-neural-readout';
-        if (item.analysis) {
-          const badge = document.createElement('strong'); badge.className = `decision-badge ${item.analysis.badge}`;
-          badge.textContent = item.analysis.badge.toUpperCase();
-          badge.title = '앱에서 정의한 운영자 참고 제안 · 자동 로봇 동작 없음';
-          const metrics = document.createElement('span');
-          metrics.textContent = `활성 ${item.analysis.activeNeurons} · 하위 ${item.analysis.downstreamRateHz.toFixed(1)} Hz${item.analysis.mn9RateHz == null ? '' : ` · MN9 ${item.analysis.mn9RateHz.toFixed(1)} Hz`}`;
-          readout.append(badge, metrics);
-        } else {
-          readout.textContent = item.analysisStatus === 'error' ? '회로 계산 오류 · 설정에서 확인' : '회로 계산 중…';
-        }
-        message.append(readout);
-      }
+    if (item.role === 'assistant' && item.audio) {
+      const controls = document.createElement('div'); controls.className = 'message-audio';
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'message-audio-button'; button.dataset.audioMessage = item.id;
+      button.addEventListener('click', () => {
+        if (playingMessageId === item.id && speaking) stopSpeaking();
+        else void playReply(item, true);
+      });
+      const status = document.createElement('span'); status.dataset.audioStatus = item.id;
+      controls.append(button, status); message.append(controls);
+    } else if (item.role === 'assistant' && item.audioError) {
+      const note = document.createElement('p'); note.className = 'message-audio-error'; note.textContent = `음성 생성 오류 · ${item.audioError}`; message.append(note);
     }
     host.append(message);
   }
   if (session.busy) {
     const pending = document.createElement('article'); pending.className = 'message assistant pending';
-    const body = document.createElement('p'); body.className = 'message-body'; body.textContent = '생각하고 있어요 ···'; pending.append(body); host.append(pending);
+    const body = document.createElement('p'); body.className = 'message-body'; body.textContent = `${stageNames[session.processingStage] || '답변을 준비하고 있어요'} ···`; pending.append(body); host.append(pending);
   }
+  updateAudioControls();
   if (nearBottom || !initialized || session.busy) host.scrollTop = host.scrollHeight;
 }
 
@@ -246,23 +236,6 @@ function svgElement(tag, attributes) {
   return element;
 }
 
-function renderExternalMetrics() {
-  const host = $('#external-brain-metrics');
-  host.hidden = !externalMode;
-  if (!externalMode) return;
-  const latest = [...externalFeed.messages].reverse().find(item => Number.isInteger(item.stimulusHz));
-  $('#sweetness-value').textContent = latest ? `${latest.stimulusHz} / 250 Hz` : '— / 250 Hz';
-  $('#sweetness-fill').style.width = `${latest ? latest.stimulusHz / 250 * 100 : 0}%`;
-  const svg = $('#brain-sparkline'); svg.replaceChildren();
-  const values = externalFeed.samples.map(item => item.downstreamRateHz);
-  if (!values.length) { svg.setAttribute('aria-label', '계산된 턴이 없습니다'); return; }
-  const max = Math.max(1, ...values);
-  const points = values.map((value, index) => `${3 + index * 154 / Math.max(1, values.length - 1)},${27 - value / max * 24}`).join(' ');
-  svg.append(svgElement('polyline', { points, fill: 'none', stroke: '#648448', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
-  values.forEach((value, index) => svg.append(svgElement('circle', { cx: 3 + index * 154 / Math.max(1, values.length - 1), cy: 27 - value / max * 24, r: 2.4, fill: '#648448' })));
-  svg.setAttribute('aria-label', `${values.length}턴의 하위 회로 발화율: ${values.map(value => value.toFixed(1)).join(', ')} Hz`);
-}
-
 function renderBrain() {
   const brain = state.brain || {};
   $('.conversation-brain').dataset.status = brain.status || 'idle';
@@ -285,7 +258,7 @@ function renderBrain() {
     return;
   }
   const decisionLabels = { wait: '대기', propose: '행동 제안', suggest_retry: '재시도 제안', confirm: '확인' };
-  const decision = externalMode ? null : decisionLabels[state.session.neuralDecision?.action];
+  const decision = decisionLabels[state.session.neuralDecision?.action];
   $('#brain-detail').textContent = `${result.neuronCount?.toLocaleString() || '—'} 뉴런 · 실제 부분회로${decision ? ` · ${decision}` : ''}`;
   const signature = JSON.stringify([result.dataHash, result.seed, result.spikeCount, result.wallTimeMs]);
   if (signature === graphSignature) return;
@@ -328,122 +301,58 @@ function renderBrain() {
 }
 
 function updateBrainActivity() {
-  const phase = externalMode ? externalFeed.phase : listening ? 'listening' : state?.session?.busy || chatInFlight ? 'thinking' : speaking ? 'speaking' : 'idle';
-  const running = state?.brain?.status === 'running';
-  const active = ['listening', 'thinking', 'speaking'].includes(phase) || running;
+  const stage = state?.session?.processingStage;
+  const running = state?.brain?.status === 'running' || stage === 'brain';
+  const phase = listening || micOpening ? 'listening' : transcribing ? 'transcribing' : running ? 'computing' : stage || (state?.session?.busy || chatInFlight ? 'responding' : speaking ? 'speaking' : 'idle');
   const card = $('.conversation-brain');
-  card.dataset.interaction = active ? phase === 'idle' ? 'computing' : phase : 'idle';
-  const labels = { listening: '듣고 있어요', thinking: '생각하고 있어요', speaking: '마음을 전하고 있어요', error: '대화 연결 확인' };
-  $('#brain-activity').textContent = labels[phase] || (running ? '신경 활동 계산 중' : '대화 대기');
-  $('#brain-replay-note').textContent = active && state?.brain?.lastResult ? '최근 계산 재생 · 대화 상태 연동' : '실제 부분회로 계산 결과';
+  card.dataset.interaction = phase === 'responding' || phase === 'synthesizing' ? 'thinking' : phase;
+  const labels = { listening: '듣고 있어요', transcribing: '말씀을 텍스트로 바꾸고 있어요', computing: '초파리 신경망 계산 중', responding: '신경망 결과로 답변 생성 중', synthesizing: '한국어 음성 생성 중', speaking: '답변을 소리로 전하고 있어요' };
+  $('#brain-activity').textContent = labels[phase] || '대화 대기';
+  $('#brain-replay-note').textContent = phase === 'computing' ? '현재 입력으로 실제 부분회로 계산 중' : state?.brain?.lastResult ? '측정한 신경 활동을 답변 생성에 반영' : '텍스트·음성 입력 → 신경망 → 답변 → 음성';
 }
 
-function disconnectExternalFeed() {
-  externalSource?.close(); externalSource = null;
-  clearTimeout(externalSilenceTimer);
-  externalMode = false; externalConnected = false;
-  $('#external-disconnect').disabled = true;
-  if (state) render(state);
-}
-
-function connectExternalFeed(url) {
-  const parsed = new URL(url);
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('인증정보가 없는 HTTP(S) 스트림 주소를 입력해 주세요.');
-  disconnectExternalFeed();
-  stopSpeaking(); discardRecognition = true; recognition?.abort();
-  externalMode = true; externalFeed = createFeedState();
-  externalBrainQueue = Promise.resolve();
-  const source = new EventSource(parsed.href);
-  externalSource = source;
-  $('#external-disconnect').disabled = false;
-  feedback('#external-feedback', '연결 중…');
-  render(state);
-  source.onopen = () => {
-    if (externalSource !== source) return;
-    externalConnected = true;
-    feedback('#external-feedback', '외부 텍스트 연결됨'); render(state);
-  };
-  source.onmessage = event => {
-    if (externalSource !== source) return;
-    try {
-      const feedEvent = JSON.parse(event.data);
-      if (!applyFeedEvent(externalFeed, feedEvent)) return;
-      const feed = externalFeed;
-      const message = feed.messages.at(-1);
-      const freshMessage = message?.id === feedEvent.id && feedEvent.type === 'message';
-      clearTimeout(externalSilenceTimer);
-      externalSilenceTimer = setTimeout(() => { externalFeed.phase = 'idle'; if (state) render(state); }, 45000);
-      render(state);
-      if (freshMessage && message.role === 'assistant') {
-        if (message.flowerColor) {
-          api('/api/external/flower', { eventId: message.id, color: message.flowerColor })
-            .catch(error => feedback('#external-feedback', `꽃 배치 제안: ${error.message}`, true));
-        }
-        if (Number.isInteger(message.stimulusHz)) {
-          externalBrainQueue = externalBrainQueue.then(async () => {
-            if (externalSource !== source || externalFeed !== feed) return;
-            try {
-              const { result } = await api('/api/brain/run', {
-                stimulusHz: message.stimulusHz, durationMs: 200, seed: message.turn,
-              });
-              if (externalSource !== source || externalFeed !== feed) return;
-              message.analysis = {
-                activeNeurons: result.activeNeurons,
-                downstreamRateHz: result.downstreamRateHz,
-                mn9RateHz: result.mn9RateHz,
-                badge: brainBadge(result.downstreamRateHz, result.mn9RateHz, BRAIN_BADGE_THRESHOLDS),
-              };
-              message.analysisStatus = 'complete';
-              feed.samples.push({ turn: message.turn, downstreamRateHz: result.downstreamRateHz });
-              if (feed.samples.length > 200) feed.samples.shift();
-              render(state);
-            } catch (error) {
-              if (externalSource !== source || externalFeed !== feed) return;
-              message.analysisStatus = 'error';
-              feedback('#brain-feedback', error.message, true);
-              render(state);
-            }
-          });
-        }
-      }
-    } catch (error) { feedback('#external-feedback', error.message, true); }
-  };
-  source.onerror = () => {
-    if (externalSource !== source) return;
-    externalConnected = false; externalFeed.phase = 'idle';
-    clearTimeout(externalSilenceTimer);
-    feedback('#external-feedback', '연결 재시도 중 · 주소와 CORS 설정을 확인해 주세요.', true); render(state);
-  };
+function updateInputControls() {
+  const enabled = Boolean(state?.settings?.apiConfigured) && state?.settings?.connectionEnabled !== false;
+  const busy = chatInFlight || Boolean(state?.session?.busy);
+  $('#send-button').disabled = !enabled || busy || listening || micOpening || transcribing;
+  $('#chat-input').disabled = !enabled || listening || micOpening || transcribing;
+  $('#chat-input').placeholder = !enabled ? '설정에서 대화 연결을 켜주세요' : '메시지를 입력하세요';
+  $('#mic-button').disabled = !microphoneSupported || !enabled || busy || micOpening || transcribing;
+  $('#mic-button').classList.toggle('listening', listening);
+  $('#mic-button').setAttribute('aria-pressed', String(listening));
+  $('#mic-button').setAttribute('aria-label', listening ? '말하기 완료' : '음성으로 말하기');
+  $('#mic-button').title = listening ? '다시 누르면 말을 마치고 전송해요' : '음성으로 말하기';
+  $$('#quick-prompts button').forEach(button => { button.disabled = !enabled || busy || listening || micOpening || transcribing; });
 }
 
 function feedback(selector, text, isError = false) { const el = $(selector); el.textContent = text; el.classList.toggle('error', isError); }
 
 async function submitChat(text) {
-  if (externalMode) return;
   text = text.trim();
-  if (/^(잠깐\s*)?(기다려|멈춰|대기|정지)(\s|[.!?]|$)/.test(text) || /^잠깐 기다려/.test(text)) {
+  if (/^(?:(?:잠깐|잠시)\s*)?(?:기다려|멈춰|정지|대기)(?:줘|주세요|해줘|해 주세요)?(?:[.!?]|$|\s)/.test(text)) {
     chatGeneration += 1;
     chatInFlight = false;
-    stopSpeaking(); discardRecognition = true; recognition?.abort();
+    stopSpeaking(); cancelRecording();
     $('#chat-input').value = ''; resizeInput();
     try { await api('/api/chat', { text }); } catch (error) { toast(error.message, true); }
     return;
   }
-  if (!text || chatInFlight || state?.session?.busy) return;
+  if (!text || chatInFlight || state?.session?.busy || state?.settings?.connectionEnabled === false) return;
   if (text.length > 2000) { toast('메시지는 2,000자까지 입력할 수 있어요.', true); return; }
   stopSpeaking();
-  if (listening) recognition?.stop();
+  if (listening || micOpening || transcribing) cancelRecording();
   const ownGeneration = ++chatGeneration;
-  chatInFlight = true; $('#send-button').disabled = true; updateBrainActivity();
+  chatInFlight = true; updateInputControls(); updateBrainActivity();
+  $('#voice-status').textContent = '';
   $('#chat-input').value = ''; resizeInput();
   try { await api('/api/chat', { text }); }
   catch (error) { if (ownGeneration === chatGeneration) { toast(error.message, true); if (!$('#chat-input').value) $('#chat-input').value = text; } }
-  finally { if (ownGeneration === chatGeneration) { chatInFlight = false; $('#send-button').disabled = Boolean(state?.session?.busy); resizeInput(); updateBrainActivity(); } }
+  finally { if (ownGeneration === chatGeneration) { chatInFlight = false; updateInputControls(); resizeInput(); updateBrainActivity(); } }
 }
 
 async function action(name) {
   if (actionInFlight && !['pause', 'reset'].includes(name)) return;
-  if (['pause', 'reset'].includes(name)) { chatGeneration += 1; chatInFlight = false; stopSpeaking(); discardRecognition = true; recognition?.abort(); }
+  if (['pause', 'reset'].includes(name)) { chatGeneration += 1; chatInFlight = false; stopSpeaking(); cancelRecording(); }
   actionInFlight = true; if (state) renderOperator();
   try { await api('/api/action', { action: name }); }
   catch (error) { toast(error.message, true); }
@@ -451,24 +360,6 @@ async function action(name) {
 }
 
 async function saveSettings(data) { return api('/api/settings', data); }
-
-function ensureModel(model) {
-  if (!model) return;
-  const select = $('#model-select');
-  if (![...select.options].some(option => option.value === model)) select.add(new Option(model, model));
-  select.value = model;
-}
-
-async function loadModels() {
-  try {
-    const result = await api('/api/models');
-    const selected = state?.settings?.model || $('#model-select').value;
-    $('#model-select').replaceChildren();
-    for (const id of result.models || []) $('#model-select').add(new Option(id.replace(/^nvidia\//i, ''), id));
-    ensureModel(selected);
-    if (!$('#model-select').options.length) $('#model-select').add(new Option('지원 모델을 확인해 주세요', ''));
-  } catch (error) { feedback('#model-feedback', error.message, true); }
-}
 
 function stopCamera() {
   cameraGeneration += 1;
@@ -579,53 +470,123 @@ async function refreshCameras() {
 
 function updateCameraFields() { const mode = $('#camera-mode').value; $('#camera-device-label').hidden = mode !== 'device'; $('#camera-url-label').hidden = mode !== 'url'; }
 
-function loadVoices() {
-  voices = window.speechSynthesis?.getVoices().filter(voice => /^ko(?:-|_)/i.test(voice.lang)) || [];
-  const select = $('#voice-select'); select.replaceChildren(new Option('기본 한국어 음성', ''));
-  for (const voice of voices) select.add(new Option(voice.name, voice.voiceURI));
-  if (voices.some(voice => voice.voiceURI === selectedVoice)) select.value = selectedVoice;
+function updateAudioControls() {
+  const labels = { playing: '재생 중', ended: '재생 완료', blocked: '버튼을 눌러 들어주세요', error: '음성 재생 오류', paused: '재생 멈춤' };
+  $$('[data-audio-message]').forEach(button => {
+    const own = button.dataset.audioMessage === playingMessageId;
+    button.textContent = own && speaking ? '■ 음성 멈추기' : own && playbackStatus === 'ended' ? '▶ 다시 듣기' : '▶ 음성 듣기';
+    button.setAttribute('aria-label', own && speaking ? '답변 음성 멈추기' : '답변 음성 듣기');
+  });
+  $$('[data-audio-status]').forEach(element => {
+    const item = state?.session?.messages?.find(message => message.id === element.dataset.audioStatus);
+    const duration = Number.isFinite(item?.audio?.durationMs) ? `${(item.audio.durationMs / 1000).toFixed(1)}초` : '';
+    element.textContent = element.dataset.audioStatus === playingMessageId ? labels[playbackStatus] || duration : duration;
+  });
+  $('#reply-voice-status').textContent = playbackStatus === 'playing' ? '노트북에서 답변 재생 중' : playbackStatus === 'blocked' ? '자동 재생이 제한됐어요. 답변 아래 음성 듣기를 눌러주세요.' : playbackStatus === 'ended' ? '답변 음성 재생 완료' : playbackStatus === 'error' ? '답변 아래 음성 듣기로 다시 시도해 주세요.' : '';
 }
 
-function stopSpeaking() { pendingSpeech = null; speaking = false; speechGeneration++; window.speechSynthesis?.cancel(); updateBrainActivity(); }
+function stopSpeaking() {
+  speechGeneration++;
+  if (replyAudio) { replyAudio.pause(); replyAudio.removeAttribute('src'); replyAudio.load(); }
+  replyAudio = null; speaking = false; playingMessageId = null; playbackStatus = 'idle';
+  updateAudioControls(); updateBrainActivity();
+}
 
-function speak(text, force = false) {
-  if (externalMode) return;
-  if (!window.speechSynthesis || (!force && !state?.settings?.voiceEnabled)) return;
-  if (listening) { pendingSpeech = text; return; }
-  window.speechSynthesis.cancel();
+async function playReply(message, force = false) {
+  if (!message?.audio?.url || (!force && !state?.settings?.voiceEnabled)) return;
+  let url;
+  try { url = new URL(message.audio.url, location.origin); if (url.origin !== location.origin) throw new Error(); }
+  catch { toast('음성 파일 주소를 확인할 수 없습니다.', true); return; }
+  if (listening || micOpening || transcribing) cancelRecording();
+  stopSpeaking();
   const generation = ++speechGeneration;
-  const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'ko-KR'; utterance.rate = 1; utterance.pitch = 1;
-  const voice = voices.find(item => item.voiceURI === selectedVoice) || voices.find(item => item.localService) || voices[0];
-  if (voice) utterance.voice = voice;
-  utterance.onstart = () => { if (generation === speechGeneration) { speaking = true; updateBrainActivity(); } };
-  utterance.onend = () => { if (generation === speechGeneration) { speaking = false; updateBrainActivity(); } };
-  utterance.onerror = event => { if (generation === speechGeneration) { speaking = false; updateBrainActivity(); } if (!['interrupted', 'canceled'].includes(event.error)) toast('음성 재생을 시작하지 못했어요. 목소리 설정을 확인해 주세요.', true); };
-  window.speechSynthesis.speak(utterance);
+  const audio = new Audio(url.href); replyAudio = audio; playingMessageId = message.id || 'voice-test';
+  audio.addEventListener('playing', () => { if (generation !== speechGeneration) return; speaking = true; playbackStatus = 'playing'; updateAudioControls(); updateBrainActivity(); });
+  audio.addEventListener('ended', () => { if (generation !== speechGeneration) return; speaking = false; playbackStatus = 'ended'; updateAudioControls(); updateBrainActivity(); });
+  audio.addEventListener('pause', () => { if (generation !== speechGeneration || audio.ended) return; speaking = false; playbackStatus = 'paused'; updateAudioControls(); updateBrainActivity(); });
+  audio.addEventListener('error', () => { if (generation !== speechGeneration) return; speaking = false; playbackStatus = 'error'; updateAudioControls(); updateBrainActivity(); });
+  try { await audio.play(); }
+  catch (error) {
+    if (generation !== speechGeneration) return;
+    speaking = false; playbackStatus = error.name === 'NotAllowedError' ? 'blocked' : 'error';
+    updateAudioControls(); updateBrainActivity();
+  }
+}
+
+function cancelRecording() {
+  micGeneration++; clearTimeout(recordingLimitTimer); recordingLimitTimer = null;
+  transcriptionController?.abort(); transcriptionController = null;
+  if (recorder?.state === 'recording') recorder.stop();
+  recorder = null; microphoneStream?.getTracks().forEach(track => track.stop()); microphoneStream = null;
+  listening = false; micOpening = false; transcribing = false;
+  $('#voice-status').textContent = ''; updateInputControls(); updateBrainActivity();
+}
+
+async function finishRecording(own, capture, chunks, tooLarge) {
+  if (own !== micGeneration) return;
+  clearTimeout(recordingLimitTimer); recordingLimitTimer = null;
+  listening = false; recorder = null;
+  microphoneStream?.getTracks().forEach(track => track.stop()); microphoneStream = null;
+  const blob = new Blob(chunks, { type: capture.mimeType || chunks[0]?.type || 'audio/webm' });
+  if (tooLarge || blob.size > 8 * 1024 * 1024) { $('#voice-status').textContent = '녹음이 너무 커요. 60초 이내로 다시 말해 주세요.'; updateInputControls(); updateBrainActivity(); return; }
+  if (!blob.size) { $('#voice-status').textContent = '녹음된 말소리가 없어요. 다시 말해 주세요.'; updateInputControls(); updateBrainActivity(); return; }
+  transcribing = true; const controller = new AbortController(); transcriptionController = controller;
+  $('#voice-status').textContent = '말씀을 텍스트로 바꾸고 있어요…'; updateInputControls(); updateBrainActivity();
+  try {
+    const response = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob, signal: controller.signal });
+    let result; try { result = await response.json(); } catch { throw new Error('음성 인식 서버의 응답을 확인할 수 없습니다.'); }
+    if (!response.ok) throw new Error(result.error || '음성을 인식하지 못했어요. 다시 말해 주세요.');
+    if (own !== micGeneration) return;
+    const text = typeof result.text === 'string' ? result.text.trim() : '';
+    if (!text) throw new Error('인식된 말소리가 없어요. 다시 말해 주세요.');
+    if (text.length > 2000) throw new Error('인식된 문장이 너무 길어요. 짧게 다시 말해 주세요.');
+    transcribing = false; transcriptionController = null;
+    $('#voice-status').textContent = '말씀을 인식했어요.'; $('#chat-input').value = text; resizeInput(); updateInputControls();
+    await submitChat(text);
+  } catch (error) {
+    if (own === micGeneration && error.name !== 'AbortError') { $('#voice-status').textContent = error.message; toast(error.message, true); }
+  } finally {
+    if (own === micGeneration) { transcribing = false; transcriptionController = null; updateInputControls(); updateBrainActivity(); }
+  }
+}
+
+async function startRecording() {
+  if (!microphoneSupported || micOpening || transcribing || chatInFlight || state?.session?.busy || state?.settings?.connectionEnabled === false) return;
+  stopSpeaking(); cancelRecording();
+  const own = ++micGeneration; micOpening = true; updateInputControls();
+  $('#voice-status').textContent = '마이크를 연결하고 있어요…';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+    if (own !== micGeneration) { stream.getTracks().forEach(track => track.stop()); return; }
+    microphoneStream = stream;
+    const mimeType = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].find(type => MediaRecorder.isTypeSupported(type));
+    const capture = new MediaRecorder(stream, mimeType ? { mimeType } : {}); recorder = capture;
+    const chunks = []; let size = 0; let tooLarge = false;
+    capture.addEventListener('dataavailable', event => {
+      if (own !== micGeneration || !event.data.size) return;
+      size += event.data.size;
+      if (size > 8 * 1024 * 1024) { tooLarge = true; if (capture.state === 'recording') capture.stop(); }
+      else chunks.push(event.data);
+    });
+    capture.addEventListener('stop', () => { void finishRecording(own, capture, chunks, tooLarge); });
+    capture.addEventListener('error', () => { if (own === micGeneration) { cancelRecording(); $('#voice-status').textContent = '마이크 녹음에 실패했어요. 다시 시도해 주세요.'; } });
+    capture.start(500); micOpening = false; listening = true;
+    recordingLimitTimer = setTimeout(() => { if (own === micGeneration && capture.state === 'recording') capture.stop(); }, 60000);
+    $('#voice-status').textContent = '듣고 있어요 · 다시 누르면 전송해요 (최대 60초)';
+    updateInputControls(); updateBrainActivity();
+  } catch (error) {
+    if (own !== micGeneration) return;
+    cancelRecording();
+    const labels = { NotAllowedError: '마이크 권한을 허용해 주세요.', NotFoundError: '연결된 마이크를 찾지 못했어요.', NotReadableError: '다른 앱이 마이크를 사용 중인지 확인해 주세요.' };
+    $('#voice-status').textContent = labels[error.name] || '마이크를 연결하지 못했어요. 다시 시도해 주세요.';
+  }
 }
 
 function setupSpeech() {
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) { $('#mic-button').disabled = true; $('#mic-button').title = '이 브라우저는 음성 인식을 지원하지 않습니다.'; $('#speech-support').textContent = '음성 입력 미지원 · Chrome 또는 Edge에서 열어주세요.'; return; }
-  recognition = new Recognition(); recognition.lang = 'ko-KR'; recognition.continuous = false; recognition.interimResults = true;
-  let finalTranscript = ''; let initialText = '';
-  recognition.onstart = () => { listening = true; updateBrainActivity(); $('#mic-button').classList.add('listening'); $('#mic-button').setAttribute('aria-pressed', 'true'); $('#voice-status').textContent = '듣고 있어요…'; };
-  recognition.onresult = event => {
-    let interim = '';
-    for (let index = event.resultIndex; index < event.results.length; index += 1) { const text = event.results[index][0].transcript; if (event.results[index].isFinal) finalTranscript += text; else interim += text; }
-    $('#chat-input').value = [initialText, finalTranscript, interim].filter(Boolean).join(' ').slice(0, 2000); resizeInput();
-  };
-  recognition.onerror = event => { const labels = { 'not-allowed': '마이크 권한을 허용해 주세요.', 'audio-capture': '마이크를 찾지 못했어요.', 'no-speech': '말소리를 듣지 못했어요.', network: '음성 인식 서비스 연결을 확인해 주세요.' }; if (event.error !== 'aborted') { $('#voice-status').textContent = labels[event.error] || '음성 인식을 다시 시도해 주세요.'; } };
-  recognition.onend = () => {
-    listening = false; updateBrainActivity(); $('#mic-button').classList.remove('listening'); $('#mic-button').setAttribute('aria-pressed', 'false');
-    if (!discardRecognition && finalTranscript.trim()) { $('#voice-status').textContent = ''; submitChat($('#chat-input').value); }
-    else if ($('#voice-status').textContent === '듣고 있어요…') $('#voice-status').textContent = '';
-    finalTranscript = ''; discardRecognition = false;
-    if (pendingSpeech) { const text = pendingSpeech; pendingSpeech = null; speak(text); }
-  };
+  $('#speech-support').textContent = microphoneSupported ? '메인의 마이크를 누르고 말한 뒤 다시 누르면 전송해요. 최대 60초까지 녹음합니다.' : '이 브라우저는 마이크 녹음을 지원하지 않아요. 메시지 입력은 사용할 수 있어요.';
   $('#mic-button').addEventListener('click', () => {
-    if (listening) { recognition.stop(); return; }
-    stopSpeaking(); discardRecognition = false; finalTranscript = ''; initialText = $('#chat-input').value.trim();
-    try { recognition.start(); } catch { toast('음성 인식을 다시 시도해 주세요.', true); }
+    if (listening && recorder?.state === 'recording') { recorder.stop(); return; }
+    void startRecording();
   });
 }
 
@@ -648,15 +609,15 @@ $('#quick-prompts').addEventListener('click', event => { const button = event.ta
 $('#operator-actions').addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (button) action(button.dataset.action); });
 $('#pause-button').addEventListener('click', event => action(event.currentTarget.dataset.action));
 
-$('#model-form').addEventListener('submit', async event => {
-  event.preventDefault(); const button = $('#model-connect'); button.disabled = true; feedback('#model-feedback', '연결 확인 중…');
-  try { await saveSettings({ model: $('#model-select').value, apiKey: $('#api-key').value }); $('#api-key').value = ''; await loadModels(); const result = await api('/api/connect', {}); feedback('#model-feedback', `연결됨${result.connection?.latencyMs ? ` · ${(result.connection.latencyMs / 1000).toFixed(1)}초` : ''}`); toast('Nebius 모델이 연결됐어요.'); }
-  catch (error) { feedback('#model-feedback', error.message, true); }
-  finally { button.disabled = false; }
+$('#connection-toggle').addEventListener('click', async () => {
+  if (connectionChanging) return;
+  const enabled = state?.settings?.connectionEnabled === false;
+  if (!enabled) { chatGeneration++; chatInFlight = false; stopSpeaking(); cancelRecording(); }
+  connectionChanging = true; $('#connection-toggle').disabled = true;
+  try { await saveSettings({ connectionEnabled: enabled }); }
+  catch (error) { toast(error.message, true); }
+  finally { connectionChanging = false; if (state) render(state); }
 });
-$('#external-feed-form').addEventListener('submit', event => { event.preventDefault(); try { connectExternalFeed($('#external-feed-url').value.trim()); } catch (error) { feedback('#external-feedback', error.message, true); } });
-$('#external-disconnect').addEventListener('click', () => { disconnectExternalFeed(); feedback('#external-feedback', '외부 연결 해제됨'); });
-$('#show-key').addEventListener('click', () => { const input = $('#api-key'); const visible = input.type === 'password'; input.type = visible ? 'text' : 'password'; $('#show-key').textContent = visible ? '숨기기' : '보기'; });
 $('#recipient-form').addEventListener('submit', async event => { event.preventDefault(); try { await saveSettings({ recipientName: $('#recipient-name').value, recipientHistory: $('#recipient-history').value, historyIsDemo: $('#history-demo').checked }); toast('이야기를 저장했어요.'); } catch (error) { toast(error.message, true); } });
 $('#camera-mode').addEventListener('change', updateCameraFields);
 $('#camera-form').addEventListener('submit', async event => { event.preventDefault(); try { await saveSettings({ cameraMode: $('#camera-mode').value, cameraUrl: $('#camera-url').value, cameraDeviceId: $('#camera-device').value }); await connectCamera(); } catch (error) { feedback('#camera-feedback', error.message, true); } });
@@ -664,24 +625,27 @@ $('#camera-connect').addEventListener('click', () => connectCamera({ ...state?.s
 $('#share-lelab').addEventListener('click', shareLeLabScreen);
 $('#disconnect-camera').addEventListener('click', () => { stopCamera(); feedback('#camera-feedback', '연결 해제됨'); });
 $('#refresh-cameras').addEventListener('click', () => refreshCameras());
-$('#voice-select').addEventListener('change', event => { selectedVoice = event.target.value; });
-$('#voice-test').addEventListener('click', () => speak('안녕하세요. 원하는 꽃을 함께 골라볼까요?', true));
+$('#voice-test').addEventListener('click', async () => {
+  $('#voice-test').disabled = true;
+  const generation = speechGeneration;
+  try { const result = await api('/api/voice/test', {}); if (generation === speechGeneration) await playReply({ id: 'voice-test', audio: result.audio }, true); }
+  catch (error) { toast(error.message, true); }
+  finally { $('#voice-test').disabled = false; }
+});
 $('#voice-stop').addEventListener('click', stopSpeaking);
-$('#voice-enabled').addEventListener('change', async event => { try { await saveSettings({ voiceEnabled: event.target.checked }); } catch (error) { event.target.checked = !event.target.checked; toast(error.message, true); } });
-$('#voice-toggle').addEventListener('click', async () => { try { await saveSettings({ voiceEnabled: !state?.settings?.voiceEnabled }); } catch (error) { toast(error.message, true); } });
+$('#voice-enabled').addEventListener('change', async event => { if (!event.target.checked) stopSpeaking(); try { await saveSettings({ voiceEnabled: event.target.checked }); } catch (error) { event.target.checked = !event.target.checked; toast(error.message, true); } });
+$('#voice-toggle').addEventListener('click', async () => { const enabled = !state?.settings?.voiceEnabled; if (!enabled) stopSpeaking(); try { await saveSettings({ voiceEnabled: enabled }); } catch (error) { toast(error.message, true); } });
 $('#brain-form').addEventListener('submit', async event => { event.preventDefault(); feedback('#brain-feedback', '신경망 준비 중…'); $('#brain-start').disabled = true; try { await saveSettings({ pythonExecutable: $('#python-executable').value, dataPath: $('#data-path').value }); await api('/api/brain/start', {}); feedback('#brain-feedback', '실제 FlyWire 부분회로 연결됨'); } catch (error) { feedback('#brain-feedback', error.message, true); } finally { $('#brain-start').disabled = false; } });
 $('#brain-test').addEventListener('click', async () => { feedback('#brain-feedback', '실제 신경 활동 계산 중…'); $('#brain-test').disabled = true; try { await api('/api/brain/run', {}); feedback('#brain-feedback', '실제 신경 계산 완료'); } catch (error) { feedback('#brain-feedback', error.message, true); } finally { $('#brain-test').disabled = false; } });
 $('#export-session').addEventListener('click', async () => { try { const result = await api('/api/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })); const link = document.createElement('a'); link.href = url; link.download = `coflorist-${new Date().toISOString().slice(0, 10)}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (error) { toast(error.message, true); } });
 $('#reset-session').addEventListener('click', async () => { if (!window.confirm('현재 대화와 작업을 초기화할까요? 필요한 기록은 먼저 내려받아 주세요.')) return; await action('reset'); toast('새로운 시연을 시작할 준비가 됐어요.'); });
-window.speechSynthesis?.addEventListener('voiceschanged', loadVoices);
-window.addEventListener('beforeunload', () => { externalSource?.close(); clearTimeout(externalSilenceTimer); stopSpeaking(); recognition?.abort(); cameraStream?.getTracks().forEach(track => track.stop()); eventSource?.close(); clearInterval(fallbackTimer); });
+window.addEventListener('beforeunload', () => { stopSpeaking(); cancelRecording(); cameraStream?.getTracks().forEach(track => track.stop()); eventSource?.close(); clearInterval(fallbackTimer); });
 
 navigate(localView);
-loadVoices();
 setupSpeech();
 if (!navigator.mediaDevices?.getDisplayMedia) {
   $('#share-lelab').disabled = true;
   $('#camera-share-help').textContent = '이 브라우저는 화면 공유를 지원하지 않습니다. 직접 카메라 연결을 사용해 주세요.';
 }
-try { await api('/api/state'); startEvents(); if (state?.settings?.apiConfigured) loadModels(); refreshCameras(); }
+try { await api('/api/state'); startEvents(); refreshCameras(); }
 catch (error) { $('#system-label').textContent = '서버 연결 확인 필요'; $('#system-dot').className = 'status-dot error'; toast(error.message, true); startEvents(); }

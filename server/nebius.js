@@ -50,7 +50,7 @@ export function parseResponse(content) {
 export async function chat(key, model, session, settings, signal) {
   validateModel(model);
   const instructions=readFileSync(new URL('./system-prompt.txt', import.meta.url),'utf8');
-  const prompt=instructions+'\n현재 앱 상태: '+JSON.stringify({recipientName:settings.recipientName,recipientHistory:settings.recipientHistory,historyIsDemo:settings.historyIsDemo,phase:session.phase,paused:session.paused,placements:session.placements,activeTask:session.activeTask,failures:session.failures.slice(-3),shortExplanation:session.preferences?.shortExplanation??true});
+  const prompt=instructions+'\n현재 앱 상태: '+JSON.stringify({recipientName:settings.recipientName,recipientHistory:settings.recipientHistory,historyIsDemo:settings.historyIsDemo,phase:session.phase,paused:session.paused,placements:session.placements,activeTask:session.activeTask,failures:session.failures.slice(-3),shortExplanation:session.preferences?.shortExplanation??true,neuralDecision:session.neuralDecision || null});
   const started = Date.now();
   const result = await request('/chat/completions', key, { model, messages: [
     {role:'system',content:prompt}, ...session.messages.slice(-16).map(m=>({role:m.role,content:m.text}))

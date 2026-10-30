@@ -1,75 +1,77 @@
 # CoFlorist
 
-A local Korean conversation dashboard for arranging flowers with an operator-assisted robot demonstration. The interface has two tabs: **메인** and **설정**. NVIDIA Nemotron on Nebius Token Factory interprets requests; an actual FlyWire-derived circuit runs through **Express → `child_process.spawn()` → Python/Brian2**. A person controls the robot and confirms physical outcomes.
+메인 화면에서 텍스트를 입력하거나 마이크로 말하면, 실제 FlyWire 부분회로를 계산한 뒤 그 결과를 반영한 Nebius 답변을 한국어 음성으로 들려주는 로컬 꽃 작업 대시보드입니다. 화면은 **메인**과 **설정**으로 구성됩니다.
 
-## Run
+대화 흐름은 다음과 같습니다.
 
-Use **Node.js 24**, a recent desktop Chrome or Edge, and a Nebius Token Factory key with access to a NVIDIA Nemotron model. On macOS, Homebrew's keg-only Node 24 can be invoked at `/opt/homebrew/opt/node@24/bin/node` without switching the default Node version.
+1. 메시지 입력칸의 텍스트 또는 마이크 녹음을 받습니다. 녹음은 로컬 Whisper가 텍스트로 인식합니다.
+2. 입력 문장을 앱의 명시적인 규칙으로 자극률에 매핑하고, Python/Brian2가 실제 FlyWire 부분회로를 계산합니다.
+3. 활성 뉴런·스파이크·하위 회로 발화율에서 읽은 결과를 NVIDIA Nemotron에 전달하여 답변을 만듭니다.
+4. 답변을 메인 대화에 표시하고 Windows 한국어 목소리로 WAV를 생성하여 브라우저에서 재생합니다.
+
+부분회로가 직접 한국어 문장을 생성하는 것은 아닙니다. 입력과 신경 자극, 신경 활동과 응답 방식의 연결은 앱에서 정의한 매핑이며, 실제 문장 생성은 Nebius의 언어 모델이 담당합니다. 신경 계산에 실패하면 해당 대화의 모델 생성을 진행하지 않습니다.
+
+## 실행
+
+Windows, Node.js 24, Python 3.10 이상, 최근 Chrome 또는 Edge, Windows 한국어 음성 팩(예: Microsoft Heami)이 필요합니다. 음성 인식과 합성은 이 PC에서 실행하며, Nebius 답변 생성에는 인터넷 연결이 필요합니다.
 
 ```powershell
 npm install
-npm start
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Open [http://localhost:4317](http://localhost:4317). The server binds to the local computer; it is not configured as a public or LAN deployment.
+이미 `.env`가 있으면 복사하지 않고 기존 파일을 사용하세요. `.env`의 `NEBIUS_API_KEY`와 `NEBIUS_MODEL`을 설정합니다. 기본 모델은 `nvidia/nemotron-3-super-120b-a12b`이며, 계정에서 사용할 수 있는 NVIDIA Nemotron 모델이어야 합니다. 키는 브라우저·SQLite·내보내기에 포함되지 않습니다.
 
-In **설정 → 대화 연결**, enter the key, select a model and press **저장하고 연결 확인**. This sends a real request to Nebius; there is no simulated success response. The default model ID is `nvidia/nemotron-3-super-120b-a12b`; availability depends on your account and the provider catalog.
-
-Keys entered in Settings stay in server memory and must be entered again after restarting. They are excluded from SQLite, API responses and exports. Alternatively, copy `.env.example` to `.env` and set `NEBIUS_API_KEY` there yourself. In that case the secret is stored in your local `.env`; the application does not write it. Never commit that file. `.env.example` also documents `PORT`, `NEBIUS_MODEL` and `PYTHON_EXECUTABLE`.
-
-## Prepare the brain worker
-
-On macOS, run `sh scripts/setup-brain-macos.sh` with Python 3.13 and `uv` (or `pip`) available. On Windows, run:
+처음 한 번 실제 신경망 데이터와 음성 인식 모델을 준비합니다.
 
 ```powershell
 powershell -File scripts/setup-brain.ps1 -PythonExecutable "C:\path\to\python.exe"
-node python/test-brain-worker.mjs
+npm run setup:voice
+npm start
 ```
 
-The setup creates `.venv`, installs pinned packages and downloads about 90 MB of upstream sources/data. It builds `data/flywire/subset.json` and a provenance manifest. It does not modify the supplied base Python runtime. In **설정 → 초파리 신경망**, use `.venv\Scripts\python.exe` and `data\flywire\subset.json` from this project, then start and test the worker. The application fills in absolute defaults.
+[http://localhost:4317](http://localhost:4317)을 여세요. 서버는 로컬 PC에만 바인딩됩니다. 기존 `.venv`와 `data/flywire/`가 준비되어 있으면 신경망 설치를 반복할 필요가 없습니다.
 
-This is a **384-neuron isolated subset with 20,407 real connections** in the current pinned-MN9 preparation, not the entire fly brain. Dialogue-to-stimulus and activity-to-action rules are engineered mappings; preference/failure records are application memory, not neural learning. See [the worker notes](python/README.md), [measured input sweep](docs/FLORA_BRAIN_SWEEP.md), and [implementation details](docs/IMPLEMENTATION.md).
+## 메인 화면에서 대화하기
 
-If you prepared `data/flywire/` before the MN9 pinning change, rerun `python/prepare_data.py` (or the setup script) before starting the worker. The generated subset and its SHA-256 manifest change when MN9 is included.
+- 입력칸에 문장을 쓰고 보내기를 누르거나, 마이크 버튼을 눌러 말한 다음 다시 눌러 녹음을 마칩니다. 녹음은 최대 60초이며 8MB 이내로 전송됩니다.
+- 메인 신경망 영역에서 실제 계산 상태와 측정 결과를 확인합니다. 이후 답변 생성과 음성 준비 상태가 이어집니다.
+- 답변 음성은 자동으로 재생됩니다. 브라우저가 자동 재생을 차단하면 해당 답변의 재생 버튼을 누르세요.
+- 대기·초기화·대화 연결 끄기는 진행 중인 대화와 재생을 중단합니다. 실제 로봇 정지는 운영자가 수행합니다.
 
-For the device dialogue feed, open **설정 → 외부 대화**, enter the local SSE endpoint, and connect. Each assistant event with `stimulus_hz` runs a fresh 200 ms trial using the assistant turn number as the seed; the reply bubble shows active neurons, downstream rate, MN9 rate, and a display-only wait/reach/offer badge. A nonempty `flower_color` adds a pending placement, which the operator must confirm through the existing controls. The sweetness bar shows the latest input rate and the sparkline shows measured downstream rates across turns. To check without a device, run `node examples/conversation-stream.mjs --demo` in another terminal and connect to its local `/events` endpoint. The example sends two synthetic dialogue turns, but the brain calculation uses the prepared real FlyWire subset.
+**설정 → 대화 연결**에는 켜기/끄기만 있습니다. API 키와 모델은 `.env`에서 읽으며 화면에서 입력하거나 변경하지 않습니다. 별도 음성 시연 페이지와 외부 대화 연결은 제공하지 않습니다.
 
-### Pluggable conversation server
+받는 사람과 이전 이야기, 카메라, 음성 출력, 신경망 경로는 기존 설정에서 관리합니다. 이전 이야기가 예시라면 **시연용 예시 이야기**로 표시하세요. 현재 대화에서 말한 조건을 먼저 사용하며, 카메라는 표시용이고 꽃이나 사람을 인식하지 않습니다. [카메라 연결 설명](docs/CAMERA.md)
 
-CoFlorist accepts any conversation server that follows the [external SSE feed contract](docs/EXTERNAL_FEED_CONTRACT.md). The conversation server can be replaced without changing the dashboard: it supplies dialogue, flower colour and stimulus Hz, while CoFlorist runs the circuit and shows operator suggestions. To inspect the full contract without a device or model key, run `node examples/conversation-stream.mjs --flora` and connect **설정 → 외부 대화** to its local `/events` endpoint. This replays the [synthetic four-turn sample](examples/flora-feed-sample.json) with stable event IDs, including WAIT, OFFER, REACH and an error state.
+## 실제 신경망 실행 범위
 
-### Flora device + server (reference implementation)
+현재 준비 데이터는 **384개 뉴런과 20,407개 실제 연결로 구성된 고립 부분회로**입니다. 전체 초파리 뇌를 실행하는 것이 아닙니다. 선호·실패 기록은 앱의 대화 기억이며 신경 학습을 의미하지 않습니다. 데이터 출처와 SHA-256은 `data/flywire/manifest.json`에 기록됩니다.
 
-The cat device and conversation server shown in the demo video are included under [`flora/`](flora/README.md). `flora/server/` is one reference implementation of the external SSE contract; a team can replace it with its own Nebius-based conversation server while keeping this dashboard. See the Flora README for server, firmware and device setup.
+메인에서 대화를 보내면 작업자가 자동으로 시작됩니다. 경로를 바꿔야 할 때는 **설정 → 초파리 신경망**에서 `.venv\Scripts\python.exe`와 `data\flywire\subset.json`을 지정하세요. 설치·부분회로 구성에 대해서는 [작업자 설명](python/README.md)과 [측정된 자극 실험](docs/FLORA_BRAIN_SWEEP.md)을 참고하세요.
 
-## 시연 순서
+## 꽃 작업과 운영자 확인
 
-1. **설정**에서 받는 사람과 이전 이야기를 저장하세요. 만들어 넣은 사례라면 **시연용 예시 이야기**를 표시하세요. 근거가 없으면 모델이 취향을 확인하도록 되어 있습니다.
-2. 카메라를 직접 선택하거나 **LeLab 화면 공유**에서 기존 LeLab 탭/창을 선택하고 한국어 목소리를 시험하세요. 카메라는 화면 표시용이며 꽃이나 사람을 인식하지 않습니다. 연결 전 사진은 참고 사진으로 표시됩니다. [카메라 연결 설명](docs/CAMERA.md)
-3. **메인**에서 사람이 먼저 말합니다. “그 사람에게 꽃을 선물하고 싶어.” → 근거 기반 흰색·빨간색 추천 → “흰 꽃을 가운데 한 송이, 빨간 꽃을 오른쪽 한 송이 놓아줘.”
-4. 운영자가 실제 로봇을 조종하고 작업 시작·배치 완료·실패·재시도를 기록합니다. “잠깐 기다려” 또는 대기 버튼은 모델 응답을 기다리지 않고 앱을 대기 상태로 바꿉니다. 실제 로봇 정지는 운영자가 수행합니다.
-5. 배치를 모두 마친 뒤 사용자가 승인합니다. 이후 **들어 올리기 → 건네기 → 실제 수령 확인 → 그리퍼 해제 확인** 순서로 진행합니다. 마지막 두 확인 전에는 전달 완료가 아닙니다.
+꽃 색·위치·수량을 지정하면 남은 배치가 제안됩니다. 운영자가 실제 로봇을 조종하고 작업 시작·배치 완료·실패·재시도를 기록합니다. 배치를 마친 뒤 사용자 승인, 들어 올리기, 건네기, 실제 수령 확인, 그리퍼 해제 확인을 차례로 수행해야 전달 완료가 됩니다.
 
-## Verification
+`flora/`와 `examples/`의 외부 기기 코드는 참고 구현으로 보관되어 있습니다. 현재 메인 화면의 대화는 위의 로컬 입력·신경 계산·Nebius·음성 경로를 사용합니다.
+
+## 검증과 저장
 
 ```powershell
 npm test
 node python/test-brain-worker.mjs
 ```
 
-The brain integration has been exercised with real data: 100 Hz input over 200 ms produced 1,260 spikes in 139 active neurons; no input produced zero spikes; silencing all stimulus outputs removed downstream propagation. Identical seeds reproduced the node rates. These are local numerical checks, not robot experiments.
+API 테스트는 별도 로컬 서버에서 환경 변수 키 비노출, 연결 끄기, 입력 검증, 운영자 상태 전이, WAV 재생과 구간 요청을 확인합니다. 신경망 작업자 검증은 실제 데이터로 자극 없는 상태와 자극 입력, 동일 시드 재현성, 연결 억제 효과를 계산합니다. 수치 검증은 실제 로봇 동작의 성공을 의미하지 않습니다.
 
-On 2026-10-25, actual account-authenticated Nemotron calls produced the expected white/red recommendation and two placement tasks. A concurrent pause cancelled an in-flight model request (HTTP 409) without altering placements. The user confirmed Korean speech input and output. All 21 local state/parser/API tests passed. **The chosen camera/screen stream and physical handoff still need validation** using the [device checklist](docs/IMPLEMENTATION.md#presentation-checklist).
+비밀이 아닌 설정과 대화·감사 기록은 `.runtime/coflorist.sqlite`에 저장됩니다. 서버 재시작은 새 활성 대화를 시작하며 설정을 유지합니다. 생성 WAV와 Whisper 모델도 Git에서 제외된 `.runtime/`에 저장됩니다. 내보내기에는 수령자 이야기와 대화·작업 기록이 포함되지만 API 키는 포함되지 않습니다.
 
-Nonsecret settings, the latest session snapshot and audit events are stored in `.runtime/coflorist.sqlite`. A server restart begins a fresh active session while retaining settings. Export includes recipient notes and session/audit data but no API key. Session reset starts a new demonstration; it does not delete historical audit records.
+## 출처와 라이선스
 
-## Sources and attribution
+- [Nebius Token Factory API](https://docs.tokenfactory.nebius.com/api-reference/introduction): 실제 NVIDIA Nemotron 모델 요청.
+- [Drosophila brain model](https://github.com/philshiu/Drosophila_brain_model/tree/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960): copyright © 2023 Philip Shiu and Nico Spiller, MIT. 원본 라이선스는 `data/flywire/source/LICENSE`에 보존됩니다.
+- [Brian2](https://brian2.readthedocs.io/): 신경 계산.
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper): CPU int8 Whisper base 음성 인식.
+- [Windows SpeechSynthesizer](https://learn.microsoft.com/en-us/uwp/api/windows.media.speechsynthesis.speechsynthesizer): 설치된 한국어 목소리로 WAV 합성.
 
-- [Nebius Token Factory API](https://api.tokenfactory.nebius.com/docs): actual hosted model requests.
-- [NVIDIA Nemotron 3 Super](https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b/build): the default NVIDIA model family; model/provider terms apply separately.
-- [Drosophila brain model](https://github.com/philshiu/Drosophila_brain_model/tree/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960): copyright © 2023 Philip Shiu and Nico Spiller, MIT license. The upstream license is preserved in `data/flywire/source/LICENSE`; source URLs and SHA-256 hashes are in `data/flywire/manifest.json`.
-- [Brian2](https://brian2.readthedocs.io/): neural simulation; [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API): browser speech input/output.
-
-## License
-
-CoFlorist is MIT-licensed (see `LICENSE`). The `flora/` reference implementation is MIT-licensed under its own `LICENSE`, except for TuyaOpen-derived files that remain Apache-2.0; see [`flora/THIRD_PARTY_NOTICES.md`](flora/THIRD_PARTY_NOTICES.md).
+CoFlorist는 MIT 라이선스입니다([LICENSE](LICENSE)). `flora/` 참고 구현은 자체 MIT 라이선스를 사용하며, TuyaOpen에서 유래한 파일에는 Apache-2.0이 적용됩니다([고지](flora/THIRD_PARTY_NOTICES.md)).
